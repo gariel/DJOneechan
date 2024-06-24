@@ -120,7 +120,15 @@ async def cmd_clear(ctx: commands.Context, *_):
 
 def buils_log_music_callback(ctx: commands.Context):
     def callback(title):
-        bot.loop.create_task(ctx.send(title))
+        async def task():
+            await ctx.send(title)
+            await bot.change_presence(
+                activity=discord.Activity(
+                    type=discord.ActivityType.listening,
+                    name=title
+                )
+            )
+        bot.loop.create_task(task())
     return callback
 
 
