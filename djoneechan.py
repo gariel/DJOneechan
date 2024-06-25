@@ -8,7 +8,7 @@ from dotenv import dotenv_values
 from base import Config, MediaItem, QueueItem
 from downloader import Downloader
 from manager import Manager
-import time
+import random
 
     
 config = Config.create(dotenv_values(".env"))
@@ -22,6 +22,20 @@ bot = commands.Bot(
         message_content=True
     )
 )
+
+welcome_sounds = [
+    "https://www.youtube.com/watch?v=AUU_YHWCRWQ",
+    "https://www.youtube.com/watch?v=wCH3q2IsXVs",
+    "https://www.youtube.com/watch?v=9MekjuKFtJo",
+    "https://www.youtube.com/watch?v=aQyk2LG3KQI",
+    "https://www.youtube.com/watch?v=N9777WExvCc",
+    "https://www.youtube.com/watch?v=0IAr0HhOVZo",
+    "https://www.youtube.com/watch?v=0VtPgIX_Dbk",
+    "https://www.youtube.com/watch?v=I88S3jUeKkE",
+    "https://www.youtube.com/watch?v=0ynT_2DDBZg",
+    "https://www.youtube.com/watch?v=MUL5w91dzbo",
+    "https://www.youtube.com/watch?v=AtbMnixO2nc",
+    ]
 
 managers: dict[str, Manager] = {}
 async def _get_manager(ctx: commands.Context) -> Manager:
@@ -42,20 +56,12 @@ async def _get_manager(ctx: commands.Context) -> Manager:
         vc = await voice_state.channel.connect()
         managers[id] = Manager(Downloader(), vc)
         # the bluetooth audio is ready to pair
-        managers[id].search_add("https://www.youtube.com/watch?v=wCH3q2IsXVs", "")
+        managers[id].search_add(welcome_sounds[random.randrange(0, len(welcome_sounds))], "")
 
     return managers[id]
 
-# @bot.event
-# async def on_message(message):
-#     if message.author.bot or not message.content.startswith(config.Prefix):
-#         return
 
-#     message.content = message.content.lower()
-
-#     await bot.process_commands(message)
-
-@bot.command("queue", aliases=["q"])
+@bot.command("queue", aliases=["q", "QUEUE", "Q"])
 async def cmd_queue(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
@@ -94,7 +100,7 @@ async def cmd_queue(ctx: commands.Context, *_):
         await ctx.send(embed=embedVar)
 
 
-@bot.command("play", aliases=["p", "add", "a"])
+@bot.command("play", aliases=["PLAY", "p", "P"])
 async def cmd_play(ctx: commands.Context, *args):
     print(ctx.author)
     if "willianzy" in str(ctx.author):
@@ -114,7 +120,7 @@ async def cmd_play(ctx: commands.Context, *args):
     manager.play(build_callback(ctx))
 
 
-@bot.command("skip", aliases=["s", "next", "n"])
+@bot.command("skip", aliases=["SKIP", "next", "NEXT"])
 async def cmd_skip(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
@@ -143,7 +149,7 @@ async def cmd_cafe(ctx: commands.Context, *_):
     await ctx.send('Pong 🏓')
 
 
-@bot.command("clear", aliases=["clean", "empty"])
+@bot.command("clear", aliases=["CLEAR", "clean", "CLEAN", "empty", "EMPTY"])
 async def cmd_clear(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
