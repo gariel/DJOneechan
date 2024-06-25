@@ -47,12 +47,13 @@ class Manager:
             if len(self.queue[0].medias) > 1:
                 self.queue[0].medias = self.queue[0].medias[:1]
     
-    def next_track(self, callback):
+    def next_media(self, callback):
         if self._vc.is_playing():
             self._vc.stop()
             return
 
         if not self.queue:
+            callback(None, None)
             return
 
         if len(self.queue[0].medias) > 1:
@@ -61,17 +62,46 @@ class Manager:
             self.queue = self.queue[1:]
 
         self.play(callback)
+    
+    def next_n_medias(self, n: int, callback):
+        #TODO: gambiarra
+        nn = n - 1
+        while nn > 0:
+            if not self.queue:
+                break
+
+            lm = len(self.queue[0].medias)
+            if lm > nn:
+                self.queue[0].medias = self.queue[0].medias[nn:]
+                break
+            
+            nn -= lm
+            self.queue = self.queue[1:]
+
+        self.next_media(callback)
+
+    def next_item(self, callback):
+        if not self.queue:
+            callback(None, None)
+            return
+        
+        #TODO: gambiarra
+        self.queue[0].medias = self.queue[0].medias[-1:]
+        self.next_media(callback)
         
     def play(self, callback):
         if self._vc.is_playing():
             return
 
-        if self.queue:
-            queue_item = self.queue[0]
-            media = queue_item.medias[0]
-            callback(queue_item, media)
+        if not self.queue:
+            callback(None, None)
+            return
+        
+        queue_item = self.queue[0]
+        media = queue_item.medias[0]
+        callback(queue_item, media)
 
-            current = media.url
-            url = self._downloader.get_media_url(current)
-            audio = discord.FFmpegOpusAudio(url)
-            self._vc.play(audio, after=lambda _: self.next_track(callback))
+        current = media.url
+        url = self._downloader.get_media_url(current)
+        audio = discord.FFmpegOpusAudio(url)
+        self._vc.play(audio, after=lambda _: self.next_media(callback))

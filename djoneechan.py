@@ -60,7 +60,7 @@ async def _get_manager(ctx: commands.Context) -> Manager:
         managers[id] = Manager(Downloader(), vc)
         # welcome sound
         managers[id].search_add(welcome_sounds[random.randrange(0, len(welcome_sounds))], bot_author)
-        managers[id].play(build_callback(ctx))
+        managers[id].play(callback)
 
     return managers[id]
 
@@ -83,10 +83,10 @@ async def cmd_queue(ctx: commands.Context, *_):
         if item.author == bot_author:
             continue
 
-        queue_list.append(f"‣ {item.title} - por {item.author}")
+        queue_list.append(f"‣ **{item.title}** - por {item.author}")
         if item.title != item.medias[0].title:
             for i, media in enumerate(item.medias):
-                queue_list.append(f"    {i+1:03d} - {media.title}")
+                queue_list.append(f" {i+1:02d} - **{media.title[:50]}**")
     
     def split(queue_list: list) -> Iterable[str]:
         queue_str = ""
@@ -108,7 +108,7 @@ async def cmd_queue(ctx: commands.Context, *_):
         return
     
     for i, queue_str in enumerate(split(queue_list)):
-        text = "🎵 Tocando agora:" if i == 0 else f"Página: {i + 1}"
+        text = "🎵 Tocando agora:" if i == 0 else ""
         embedVar = discord.Embed(color=config.Color)
         embedVar.add_field(name=text, value=queue_str)
         await ctx.send(embed=embedVar)
@@ -132,7 +132,8 @@ async def cmd_play(ctx: commands.Context, *args):
     else:
         await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')
     
-    manager.play(build_callback(ctx))
+    manager.play(callback)
+
 
 @bot.command("insert", aliases=["INSERT", "inject", "INJECT", "i", "I", "playnext", "PLAYNEXT", "pn", "PN"],
              help="Adds a music or a playlist as next in the queue")
@@ -148,17 +149,37 @@ async def cmd_insert(ctx: commands.Context, *args):
     else:
         await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')
     
-    manager.play(build_callback(ctx))
+    manager.play(callback)
 
 
-@bot.command("skip", aliases=["SKIP", "next", "NEXT", "n", "N"],
+@bot.command("skip", aliases=["SKIP", "next", "NEXT", "n", "N", "s", "S"],
              help="Skips the current music")
-async def cmd_skip(ctx: commands.Context, *_):
+async def cmd_skip(ctx: commands.Context, *args):
     manager = await _get_manager(ctx)
     if not manager:
         return
-    await ctx.send('🎵 Pulando para a próxima música')
-    manager.next_track(build_callback(ctx))
+    
+    if not args or len(args) != 1:
+        await ctx.send('🎵 Pulando para a próxima música')
+        manager.next_media(callback)
+    else:
+        try:
+            n = int(args[0])
+        except Exception:
+            await ctx.send(f'que que se falo? "{args[0]}" devia ser um numero')
+
+        await ctx.send(f'🎵 Pulando {n} músicas')
+        manager.next_n_medias(n, callback)
+
+
+@bot.command("skipplaylist", aliases=["SKIPPLAYLIST", "sp", "SP"],
+             help="Skips the current item (music or playlist)")
+async def cmd_skip_playlist(ctx: commands.Context, *_):
+    manager = await _get_manager(ctx)
+    if not manager:
+        return
+    await ctx.send('🎵 Pulando o item atual')
+    manager.next_item(callback)
 
 
 @bot.command("stop", aliases=["STOP"],
@@ -169,7 +190,7 @@ async def cmd_stop(ctx: commands.Context, *_):
         return
     await ctx.send('Queue limpa e player parado ʕ•ᴥ•ʔ')
     manager.clear_queue()
-    manager.next_track(build_callback(ctx))
+    manager.next_item(callback)
 
 
 @bot.command("clear", aliases=["CLEAR", "clean", "CLEAN", "empty", "EMPTY"],
@@ -192,6 +213,7 @@ async def cmd_cafe(ctx: commands.Context, *_):
 async def cmd_cafe(ctx: commands.Context, *_):
     await ctx.send('Pong 🏓')
 
+
 @bot.event
 async def on_voice_state_update(member: discord.member.Member, before: discord.VoiceState, after: discord.VoiceState):
     # disconects when everyone leaves
@@ -206,12 +228,9 @@ async def on_voice_state_update(member: discord.member.Member, before: discord.V
             await vc.disconnect()
 
 
-def build_callback(ctx: commands.Context):
-    def callback(queue_item: QueueItem, media_item: MediaItem):
-        if queue_item.author == bot_author:
-            return
-        
-        async def task():
+def callback(queue_item: QueueItem, media_item: MediaItem):
+    async def task(has_music: bool):
+        if has_music:
             await bot.change_presence(
                 activity=discord.Activity(
                     type=discord.ActivityType.playing,
@@ -219,8 +238,15 @@ def build_callback(ctx: commands.Context):
                     state=f"Adicionado por {queue_item.author}",
                 )
             )
-        bot.loop.create_task(task())
-    return callback
+        else:
+            await bot.change_presence(
+                activity=discord.Activity(
+                    type=discord.ActivityType.unknown
+                )
+            )
+
+    has_music = queue_item and queue_item.author != bot_author
+    bot.loop.create_task(task(has_music))
 
 
 def get_voice_client_from_channel_id(channel_id: int) -> discord.VoiceProtocol:
