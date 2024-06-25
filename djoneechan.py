@@ -10,9 +10,9 @@ from downloader import Downloader
 from manager import Manager
 import random
 
-    
-config = Config.create(dotenv_values(".env"))
 
+config = Config.create(dotenv_values(".env"))
+bot_author = "<bot>"
 bot = commands.Bot(
     command_prefix=config.Prefix,
     intents=discord.Intents(
@@ -23,45 +23,50 @@ bot = commands.Bot(
     )
 )
 
+
 welcome_sounds = [
-    "https://www.youtube.com/watch?v=AUU_YHWCRWQ",
-    "https://www.youtube.com/watch?v=wCH3q2IsXVs",
-    "https://www.youtube.com/watch?v=9MekjuKFtJo",
-    "https://www.youtube.com/watch?v=aQyk2LG3KQI",
-    "https://www.youtube.com/watch?v=N9777WExvCc",
-    "https://www.youtube.com/watch?v=0IAr0HhOVZo",
-    "https://www.youtube.com/watch?v=0VtPgIX_Dbk",
-    "https://www.youtube.com/watch?v=I88S3jUeKkE",
-    "https://www.youtube.com/watch?v=0ynT_2DDBZg",
-    "https://www.youtube.com/watch?v=MUL5w91dzbo",
-    "https://www.youtube.com/watch?v=AtbMnixO2nc",
-    ]
+    "https://www.youtube.com/watch?v=AUU_YHWCRWQ", # Mourão Bom Dia
+    "https://www.youtube.com/watch?v=wCH3q2IsXVs", # The Bluetooth Device Is Ready To Pair
+    "https://www.youtube.com/watch?v=9MekjuKFtJo", # boraaa acorda fdp
+    "https://www.youtube.com/watch?v=aQyk2LG3KQI", # Você É Um Filho Da Puta He-Man
+    "https://www.youtube.com/watch?v=N9777WExvCc", # Among Us Impostor
+    "https://www.youtube.com/watch?v=0IAr0HhOVZo", # Samsung
+    "https://www.youtube.com/watch?v=0VtPgIX_Dbk", # It's Time to D-D-D-D DUEL!
+    "https://www.youtube.com/watch?v=I88S3jUeKkE", # Jesus Christ its jason bourne
+    "https://www.youtube.com/watch?v=0ynT_2DDBZg", # SOMEBODY TOUCHA MY SPAGHET
+    "https://www.youtube.com/watch?v=MUL5w91dzbo", # Goofy Yell
+    "https://www.youtube.com/watch?v=AtbMnixO2nc", # Tourettes Guy hits his head
+    "https://www.youtube.com/watch?v=UINZ8oRDIkU", # Rapaz é o seguinte, cambio desligo
+]
+
 
 managers: dict[str, Manager] = {}
 async def _get_manager(ctx: commands.Context) -> Manager:
+    global managers
+    id = ctx.guild.id
     voice_state = ctx.author.voice
     if voice_state is None:
         await ctx.send('Você precisa estar em um canal de voz para usar esse comando')
         return None
 
-    # member_ids = [member.id for member in ctx.author.voice.channel.members]
-    # if bot.user.id not in member_ids: # TODO and ctx.guild.id in queues.keys():
-    #     await ctx.send('you have to be in the same voice channel as the bot to use this command')
-    #     return None
+    member_ids = [member.id for member in ctx.author.voice.channel.members]
+    if bot.user.id not in member_ids and id in managers:
+        await ctx.send('you have to be in the same voice channel as the bot to use this command')
+        return None
 
-    global managers
-    id = ctx.guild.id
     if id not in managers:
         voice_state = ctx.author.voice
         vc = await voice_state.channel.connect()
         managers[id] = Manager(Downloader(), vc)
-        # the bluetooth audio is ready to pair
-        managers[id].search_add(welcome_sounds[random.randrange(0, len(welcome_sounds))], "")
+        # welcome sound
+        managers[id].search_add(welcome_sounds[random.randrange(0, len(welcome_sounds))], bot_author)
+        managers[id].play(build_callback(ctx))
 
     return managers[id]
 
 
-@bot.command("queue", aliases=["q", "QUEUE", "Q"])
+@bot.command("queue", aliases=["q", "QUEUE", "Q"],
+             help="Shows the queue")
 async def cmd_queue(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
@@ -75,6 +80,9 @@ async def cmd_queue(ctx: commands.Context, *_):
     
     queue_list = []
     for item in manager.queue:
+        if item.author == bot_author:
+            continue
+
         queue_list.append(f"‣ {item.title} - por {item.author}")
         if item.title != item.medias[0].title:
             for i, media in enumerate(item.medias):
@@ -93,6 +101,12 @@ async def cmd_queue(ctx: commands.Context, *_):
         if queue_str:
             yield queue_str
     
+    if not queue_list:
+        embedVar = discord.Embed(color=config.Color)
+        embedVar.add_field(name="🎵 Nada tocando agora", value="")
+        await ctx.send(embed=embedVar)
+        return
+    
     for i, queue_str in enumerate(split(queue_list)):
         text = "🎵 Tocando agora:" if i == 0 else f"Página: {i + 1}"
         embedVar = discord.Embed(color=config.Color)
@@ -100,7 +114,8 @@ async def cmd_queue(ctx: commands.Context, *_):
         await ctx.send(embed=embedVar)
 
 
-@bot.command("play", aliases=["PLAY", "p", "P"])
+@bot.command("play", aliases=["PLAY", "p", "P", "add", "ADD", "a", "A"],
+             help="Adds a music or a playlist to the queue")
 async def cmd_play(ctx: commands.Context, *args):
     print(ctx.author)
     if "willianzy" in str(ctx.author):
@@ -119,8 +134,25 @@ async def cmd_play(ctx: commands.Context, *args):
     
     manager.play(build_callback(ctx))
 
+@bot.command("insert", aliases=["INSERT", "inject", "INJECT", "i", "I", "playnext", "PLAYNEXT", "pn", "PN"],
+             help="Adds a music or a playlist as next in the queue")
+async def cmd_insert(ctx: commands.Context, *args):
+    manager = await _get_manager(ctx)
+    if not manager:
+        return
+    
+    query = ' '.join(args)
+    queue_item = manager.search_add_next(query, str(ctx.author))
+    if queue_item:
+        await ctx.send(f'🎵 {queue_item.title} injetada como próxima da fila ヽ(゜∇゜)ノ')
+    else:
+        await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')
+    
+    manager.play(build_callback(ctx))
 
-@bot.command("skip", aliases=["SKIP", "next", "NEXT"])
+
+@bot.command("skip", aliases=["SKIP", "next", "NEXT", "n", "N"],
+             help="Skips the current music")
 async def cmd_skip(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
@@ -129,7 +161,8 @@ async def cmd_skip(ctx: commands.Context, *_):
     manager.next_track(build_callback(ctx))
 
 
-@bot.command("stop", aliases=["STOP"])
+@bot.command("stop", aliases=["STOP"],
+             help="Clean the queue and stop the music")
 async def cmd_stop(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
@@ -139,17 +172,8 @@ async def cmd_stop(ctx: commands.Context, *_):
     manager.next_track(build_callback(ctx))
 
 
-@bot.command("cafe", aliases=["CAFE", "coffee", "COFFEE", "☕"])
-async def cmd_cafe(ctx: commands.Context, *_):
-    await ctx.send('cafe ? 🐔☕')
-
-
-@bot.command("ping", aliases=["PING"])
-async def cmd_cafe(ctx: commands.Context, *_):
-    await ctx.send('Pong 🏓')
-
-
-@bot.command("clear", aliases=["CLEAR", "clean", "CLEAN", "empty", "EMPTY"])
+@bot.command("clear", aliases=["CLEAR", "clean", "CLEAN", "empty", "EMPTY"],
+             help="Clean the queue but keep the current music playing")
 async def cmd_clear(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
@@ -157,9 +181,36 @@ async def cmd_clear(ctx: commands.Context, *_):
     await ctx.send('❌ Queue limpa')
     manager.clear_queue()
 
+@bot.command("cafe", aliases=["CAFE", "coffee", "COFFEE", "☕"],
+             help="Makes some delicious coffee")
+async def cmd_cafe(ctx: commands.Context, *_):
+    await ctx.send('cafe ? 🐔☕')
+
+
+@bot.command("ping", aliases=["PING"],
+             help="Response test")
+async def cmd_cafe(ctx: commands.Context, *_):
+    await ctx.send('Pong 🏓')
+
+@bot.event
+async def on_voice_state_update(member: discord.member.Member, before: discord.VoiceState, after: discord.VoiceState):
+    # disconects when everyone leaves
+    if not before.channel:
+        return
+    
+    members = [member for member in before.channel.members if member.id != bot.user.id]
+    if not members:
+        vc = get_voice_client_from_channel_id(before.channel.id)
+        if vc:
+            del managers[before.channel.guild.id]
+            await vc.disconnect()
+
 
 def build_callback(ctx: commands.Context):
     def callback(queue_item: QueueItem, media_item: MediaItem):
+        if queue_item.author == bot_author:
+            return
+        
         async def task():
             await bot.change_presence(
                 activity=discord.Activity(
@@ -172,7 +223,7 @@ def build_callback(ctx: commands.Context):
     return callback
 
 
-def get_voice_client_from_channel_id(channel_id: int):
+def get_voice_client_from_channel_id(channel_id: int) -> discord.VoiceProtocol:
     for voice_client in bot.voice_clients:
         if voice_client.channel.id == channel_id:
             return voice_client
