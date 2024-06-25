@@ -33,3 +33,4 @@ class MediaItem:
 class QueueItem:
     title: str
     medias: list[MediaItem]
+    author: str = ""

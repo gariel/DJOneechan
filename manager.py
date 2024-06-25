@@ -1,4 +1,5 @@
 
+import random
 from typing import Optional
 
 import discord
@@ -11,9 +12,11 @@ class Manager:
         self._downloader = downloader
         self._vc = vc
         
-    def search_add(self, search: str) -> Optional[QueueItem]:
+    def search_add(self, search: str, author: str) -> Optional[QueueItem]:
         queue_item = self._downloader.get_queue_item(search)
+        queue_item.author = author
         if queue_item:
+            random.shuffle(queue_item.medias)
             self.queue.append(queue_item)
         return queue_item
     
@@ -43,8 +46,10 @@ class Manager:
             return
 
         if self.queue:
-            media = self.queue[0].medias[0]
-            callback(media.title)
+            queue_item = self.queue[0]
+            media = queue_item.medias[0]
+            callback(queue_item, media)
+            
             current = media.url
             url = self._downloader.get_media_url(current)
             audio = discord.FFmpegOpusAudio(url)
