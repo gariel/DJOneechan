@@ -65,8 +65,23 @@ async def _get_manager(ctx: commands.Context) -> Manager:
     return managers[id]
 
 
+@bot.command("disconnect", aliases=["leave", "DISCONNECT", "LEAVE"], help="Desconecta do canal de voz")
+async def cmd_disconnect(ctx: commands.Context, *_):
+    voice_client = ctx.guild.voice_client
+    if voice_client:
+        await voice_client.disconnect()
+        await ctx.reply("Disconnected from voice channel.")
+    else:
+        await ctx.reply("I'm not connected to any voice channel.")
+
+
+@bot.command("connect", aliases=["join", "CONNECT", "JOIN"], help="Conecta ao canal de voz")
+async def cmd_connect(ctx: commands.Context, *_):
+    await _get_manager(ctx)
+    
+
 @bot.command("queue", aliases=["q", "QUEUE", "Q"],
-             help="Shows the queue")
+             help="Mostra a fila de músicas")
 async def cmd_queue(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
@@ -115,7 +130,7 @@ async def cmd_queue(ctx: commands.Context, *_):
 
 
 @bot.command("play", aliases=["PLAY", "p", "P", "add", "ADD", "a", "A"],
-             help="Adds a music or a playlist to the queue")
+             help="Adiciona uma música na fila de reprodução")
 async def cmd_play(ctx: commands.Context, *args):
     print(ctx.author)
     if "willianzy" in str(ctx.author):
@@ -136,7 +151,7 @@ async def cmd_play(ctx: commands.Context, *args):
 
 
 @bot.command("insert", aliases=["INSERT", "inject", "INJECT", "i", "I", "playnext", "PLAYNEXT", "pn", "PN"],
-             help="Adds a music or a playlist as next in the queue")
+             help="Adiciona uma música na fila de reprodução como próxima")
 async def cmd_insert(ctx: commands.Context, *args):
     manager = await _get_manager(ctx)
     if not manager:
@@ -153,7 +168,7 @@ async def cmd_insert(ctx: commands.Context, *args):
 
 
 @bot.command("skip", aliases=["SKIP", "next", "NEXT", "n", "N", "s", "S"],
-             help="Skips the current music")
+             help="Pula a música atual ou x músicas")
 async def cmd_skip(ctx: commands.Context, *args):
     manager = await _get_manager(ctx)
     if not manager:
@@ -173,7 +188,7 @@ async def cmd_skip(ctx: commands.Context, *args):
 
 
 @bot.command("skipplaylist", aliases=["SKIPPLAYLIST", "sp", "SP"],
-             help="Skips the current item (music or playlist)")
+             help="Pula a playlist atual")
 async def cmd_skip_playlist(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
@@ -183,7 +198,7 @@ async def cmd_skip_playlist(ctx: commands.Context, *_):
 
 
 @bot.command("stop", aliases=["STOP"],
-             help="Clean the queue and stop the music")
+             help="Para a reprodução do BOT")
 async def cmd_stop(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
@@ -194,7 +209,7 @@ async def cmd_stop(ctx: commands.Context, *_):
 
 
 @bot.command("clear", aliases=["CLEAR", "clean", "CLEAN", "empty", "EMPTY"],
-             help="Clean the queue but keep the current music playing")
+             help="Limpa a fila de reprodução")
 async def cmd_clear(ctx: commands.Context, *_):
     manager = await _get_manager(ctx)
     if not manager:
@@ -203,7 +218,7 @@ async def cmd_clear(ctx: commands.Context, *_):
     manager.clear_queue()
 
 @bot.command("cafe", aliases=["CAFE", "coffee", "COFFEE", "☕"],
-             help="Makes some delicious coffee")
+             help="Faz um cafezinho")
 async def cmd_cafe(ctx: commands.Context, *_):
     await ctx.send('cafe ? 🐔☕')
 
