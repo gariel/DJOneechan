@@ -51,7 +51,7 @@ async def _get_manager(ctx: commands.Context) -> Manager:
 
     member_ids = [member.id for member in ctx.author.voice.channel.members]
     if bot.user.id not in member_ids and id in managers:
-        await ctx.send('you have to be in the same voice channel as the bot to use this command')
+        await ctx.send('Você precisa estar no mesmo canal de voz para usar esse comando')
         return None
 
     if id not in managers:
@@ -70,9 +70,11 @@ async def cmd_disconnect(ctx: commands.Context, *_):
     voice_client = ctx.guild.voice_client
     if voice_client:
         await voice_client.disconnect()
-        await ctx.reply("Disconnected from voice channel.")
+        await ctx.send("Disconnected from voice channel.")
+        if ctx.guild.id in managers:
+            del managers[ctx.guild.id]
     else:
-        await ctx.reply("I'm not connected to any voice channel.")
+        await ctx.send("I'm not connected to any voice channel.")
 
 
 @bot.command("connect", aliases=["join", "CONNECT", "JOIN"], help="Conecta ao canal de voz")
@@ -129,12 +131,11 @@ async def cmd_queue(ctx: commands.Context, *_):
         await ctx.send(embed=embedVar)
 
 
-@bot.command("play", aliases=["PLAY", "p", "P", "add", "ADD", "a", "A"],
-             help="Adiciona uma música na fila de reprodução")
+@bot.command("play", aliases=["PLAY", "p", "P", "add", "ADD", "a", "A"], help="Adiciona uma música na fila de reprodução")
 async def cmd_play(ctx: commands.Context, *args):
     print(ctx.author)
     if "willianzy" in str(ctx.author):
-        await ctx.send("La vem musica de tchola do zy")
+        await ctx.send("La vem musica de tchola do zy")  # Changed from ctx.reply to ctx.send
     
     manager = await _get_manager(ctx)
     if not manager:
@@ -143,9 +144,9 @@ async def cmd_play(ctx: commands.Context, *args):
     query = ' '.join(args)
     queue_item = manager.search_add(query, str(ctx.author))
     if queue_item:
-        await ctx.send(f'🎵 {queue_item.title} adicionada na queue ≧◡≦')
+        await ctx.send(f'🎵 {queue_item.title} adicionada na queue ≧◡≦')  # Changed from ctx.reply to ctx.send
     else:
-        await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')
+        await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')  # Changed from ctx.reply to ctx.send
     
     manager.play(callback)
 
