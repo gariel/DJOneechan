@@ -22,7 +22,7 @@ class Manager:
         queue_item = self._downloader.get_queue_item(search)
         queue_item.author = author
         if queue_item:
-            random.shuffle(queue_item.medias)
+            # random.shuffle(queue_item.medias)
 
             if not self.queue or not next:
                 self.queue.append(queue_item)
@@ -105,3 +105,11 @@ class Manager:
         url = self._downloader.get_media_url(current)
         audio = discord.FFmpegOpusAudio(url)
         self._vc.play(audio, after=lambda _: self.next_media(callback))
+
+    def shuffle(self, callback):
+        if not self.queue:
+            callback(None, None)
+            return
+        
+        queue_item = self.queue[0]
+        random.shuffle(queue_item.medias)

@@ -151,6 +151,21 @@ async def cmd_play(ctx: commands.Context, *args):
     manager.play(callback)
 
 
+@bot.command("shuffle", aliases=["SHUFFLE"], help="Randomiza a playlist atual")
+async def cmd_shuffle(ctx: commands.Context, *args):
+    manager = await _get_manager(ctx)
+    if not manager:
+        return
+
+    queue = manager.queue
+    if queue:
+        await ctx.send(f'Playlist randomizada ≧◡≦')
+    else:
+        await ctx.send(f'❌ Não consegui identificar a playlist, tente novamente ツ')
+    
+    manager.shuffle(callback)
+
+
 @bot.command("insert", aliases=["INSERT", "inject", "INJECT", "i", "I", "playnext", "PLAYNEXT", "pn", "PN"],
              help="Adiciona uma música na fila de reprodução como próxima")
 async def cmd_insert(ctx: commands.Context, *args):
