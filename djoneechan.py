@@ -269,6 +269,11 @@ async def on_voice_state_update(member: discord.member.Member,
             await vc.disconnect(force=True)
 
 
+def sort_params(args, *types) -> list:
+    mapping = {type(a): a for a in args}
+    return [mapping[t] for t in types]
+
+
 class Buttons(discord.ui.View):
     def __init__(self, manager, callback):
         super().__init__()
@@ -276,7 +281,8 @@ class Buttons(discord.ui.View):
         self.callback = callback
 
     @discord.ui.button(label="🔀", style=discord.ButtonStyle.gray, custom_id="shuffle")
-    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def prev_button(self, *args):
+        interaction, button = sort_params(args, discord.Interaction, discord.ui.Button)
         self.manager.shuffle()
         try:
             await interaction.response.edit_message()
@@ -284,7 +290,8 @@ class Buttons(discord.ui.View):
             pass
 
     @discord.ui.button(label="⏭️", style=discord.ButtonStyle.gray, custom_id="next")
-    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def next_button(self, *args):
+        interaction, button = sort_params(args, discord.Interaction, discord.ui.Button)
         self.manager.next(self.callback)
         self.callback()
         try:
