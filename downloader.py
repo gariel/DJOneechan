@@ -2,8 +2,9 @@ import yt_dlp
 from base import QueueItem
 import youtubeextractor
 
+
 class Downloader:
-    def get_queue_item(self, search: str) -> QueueItem:
+    def get_queue_items(self, search: str) -> list[QueueItem]:
         return youtubeextractor.extract(search)
 
     def get_media_url(self, url: str) -> str:
@@ -15,5 +16,6 @@ class Downloader:
             'noplaylist': True,
             'allow_playlist_files': False,
             'paths': {'home': './dl/'}}) as ydl:
+
             info = ydl.extract_info(url, download=False)
             return info["url"]

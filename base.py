@@ -24,13 +24,9 @@ class Config:
             Color=Config.convert_color(env.get("BOT_COLOR"))
     )
 
-@dataclass
-class MediaItem:
-    url: str
-    title: str
 
 @dataclass
 class QueueItem:
     title: str
-    medias: list[MediaItem]
+    url: str
     author: str = ""

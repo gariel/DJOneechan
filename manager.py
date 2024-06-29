@@ -1,115 +1,82 @@
 
 import random
-from typing import Optional
 
 import discord
+from discord.errors import ClientException
 from base import QueueItem
 from downloader import Downloader
 
+
 class Manager:
     def __init__(self, downloader: Downloader, vc: discord.VoiceClient):
-        self.queue : list[QueueItem] = []
+        self.queue: list[QueueItem] = []
         self._downloader = downloader
         self._vc = vc
         
-    def search_add(self, search: str, author: str) -> Optional[QueueItem]:
+    def search_add(self, search: str, author: str) -> list[QueueItem]:
         return self._search_add(search, author, False)
     
-    def search_add_next(self, search: str, author: str) -> Optional[QueueItem]:
+    def search_add_next(self, search: str, author: str) -> list[QueueItem]:
         return self._search_add(search, author, True)
     
-    def _search_add(self, search: str, author: str, next: bool) -> Optional[QueueItem]:
-        queue_item = self._downloader.get_queue_item(search)
-        queue_item.author = author
-        if queue_item:
-            # random.shuffle(queue_item.medias)
+    def _search_add(self, search: str, author: str, next: bool) -> list[QueueItem]:
+        queue_items = self._downloader.get_queue_items(search)
 
-            if not self.queue or not next:
-                self.queue.append(queue_item)
-            else:
-                current = self.queue[0]
-                if len(current.medias) > 1:
-                    broke = QueueItem(
-                        title=current.title,
-                        medias=current.medias[1:],
-                        author=current.author,
-                    )
-                    current.medias = current.medias[:1]
-                    self.queue = [current, queue_item, broke, *self.queue[1:]]
-                else:
-                    self.queue = [current, queue_item, *self.queue[1:]]
+        for qi in queue_items:
+            qi.author = author
+
+        if not self.queue or not next:
+            self.queue.extend(queue_items)
+        else:
+            self.queue = [self.queue[0], *queue_items, *self.queue[1:]]
             
-        return queue_item
+        return queue_items
     
     def clear_queue(self):
         if self.queue:
             self.queue = self.queue[:1]
-            if len(self.queue[0].medias) > 1:
-                self.queue[0].medias = self.queue[0].medias[:1]
     
-    def next_media(self, callback):
+    def next(self, callback):
         if self._vc.is_playing():
             self._vc.stop()
             return
 
         if not self.queue:
-            callback(None, None)
             return
 
-        if len(self.queue[0].medias) > 1:
-            self.queue[0].medias = self.queue[0].medias[1:]
-        else:
-            self.queue = self.queue[1:]
-
+        self.queue = self.queue[1:]
         self.play(callback)
+
+    def _internal_next(self, callback):
+        self.next(callback)
+        callback()
     
-    def next_n_medias(self, n: int, callback):
-        #TODO: gambiarra
-        nn = n - 1
-        while nn > 0:
-            if not self.queue:
-                break
+    def next_n(self, n: int, callback):
+        if n > 1:
+            self.queue = self.queue[n-1:]  # TODO: gambiarra
+        self.next(callback)
 
-            lm = len(self.queue[0].medias)
-            if lm > nn:
-                self.queue[0].medias = self.queue[0].medias[nn:]
-                break
-            
-            nn -= lm
-            self.queue = self.queue[1:]
-
-        self.next_media(callback)
-
-    def next_item(self, callback):
-        if not self.queue:
-            callback(None, None)
-            return
-        
-        #TODO: gambiarra
-        self.queue[0].medias = self.queue[0].medias[-1:]
-        self.next_media(callback)
-        
     def play(self, callback):
         if self._vc.is_playing():
             return
 
         if not self.queue:
-            callback(None, None)
             return
-        
-        queue_item = self.queue[0]
-        media = queue_item.medias[0]
-        callback(queue_item, media)
 
-        current = media.url
+        queue_item = self.queue[0]
+
+        current = queue_item.url
         url = self._downloader.get_media_url(current)
         audio = discord.FFmpegOpusAudio(url)
-        self._vc.play(audio, after=lambda _: self.next_media(callback))
+        try:
+            self._vc.play(audio, after=lambda _: self._internal_next(callback))
+        except ClientException:
+            pass
 
-    def shuffle(self, callback):
+    def shuffle(self):
         if not self.queue:
-            callback(None, None)
             return
-        
-        queue_item = self.queue[0]
-        random.shuffle(queue_item.medias)
+
+        head, *tail = self.queue
+        random.shuffle(tail)
+        self.queue = [head, *tail]

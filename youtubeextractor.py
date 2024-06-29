@@ -1,7 +1,9 @@
 import json
+from typing import Iterable
+
 import requests
 import urllib
-from base import MediaItem, QueueItem
+from base import QueueItem
 
 
 def _search(data):
@@ -9,19 +11,14 @@ def _search(data):
         for video in contents["itemSectionRenderer"]["contents"]:
             if "videoRenderer" in video.keys():
                 video_data = video.get("videoRenderer", {})
-                
+
                 id = video_data["videoId"]
                 url = f"https://www.youtube.com/watch?v={id}"
                 title = video_data.get("title", {}).get("runs", [[{}]])[0].get("text", None)
 
                 return QueueItem(
                     title=title,
-                    medias=[
-                        MediaItem(
-                            title=title,
-                            url=url,
-                        ),
-                    ],
+                    url=url,
                 )
     return None
 
@@ -32,39 +29,35 @@ def _video(url: str, data: dict) -> QueueItem:
         if "videoPrimaryInfoRenderer" in content:
             video = content["videoPrimaryInfoRenderer"]
             title = video["title"]["runs"][0]["text"]
+            break
     
     return QueueItem(
         title=title,
-        medias=[
-            MediaItem(
-                title=title,
-                url=url,
-            ),
-        ],
+        url=url,
     )
 
 
-def _playlist(data: dict) -> QueueItem:
+def _playlist(data: dict) -> list[QueueItem]:
     playlist = data["contents"]["twoColumnWatchNextResults"]["playlist"]["playlist"]
-    title = playlist["title"]
 
-    medias = []
+    items : list[QueueItem] = []
     for video in playlist["contents"]:
         if "playlistPanelVideoRenderer" in video.keys():
             video_data = video.get("playlistPanelVideoRenderer", {})
             id = video_data["videoId"]
-            medias.append(MediaItem(
-                url=f"https://www.youtube.com/watch?v={id}",
-                title=video_data.get("title", {}).get("simpleText", id),
+
+            title = str(video_data.get("title", {}).get("simpleText", id))
+            url=f"https://www.youtube.com/watch?v={id}"
+
+            items.append(QueueItem(
+                title=title,
+                url=url,
             ))
 
-    return QueueItem(
-        title=title,
-        medias=medias
-    )
+    return items
 
 
-def _parse(url: str, is_search: bool) -> QueueItem:
+def _parse(url: str, is_search: bool) -> Iterable[QueueItem]:
     if "music.youtube" in url:
         url = url.replace("music.youtube", "youtube")
 
@@ -82,18 +75,20 @@ def _parse(url: str, is_search: bool) -> QueueItem:
     data = json.loads(json_str)
 
     if is_search:
-        return _search(data)
+        yield _search(data)
 
-    if "&list=" in url:
-        return _playlist(data)
-    return _video(url, data)
+    elif "&list=" in url:
+        for video in _playlist(data):
+            yield video
+    else:
+        yield _video(url, data)
 
 
-def extract(text: str) -> QueueItem:
+def extract(text: str) -> list[QueueItem]:
     is_search = not urllib.parse.urlparse(text).scheme
 
     if is_search:
         encoded_search = urllib.parse.quote_plus(text)
         text = f"https://youtube.com/results?search_query={encoded_search}"
 
-    return _parse(text, is_search)
+    return list(item for item in _parse(text, is_search) if item)
