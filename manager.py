@@ -1,10 +1,12 @@
-
 import random
+from io import BytesIO
 
 import discord
 from discord.errors import ClientException
+from discord.voice_client import AudioPlayer
 from base import QueueItem
 from downloader import Downloader
+from gtts import gTTS
 
 
 class Manager:
@@ -41,6 +43,11 @@ class Manager:
             self._vc.stop()
             return
 
+        if self._vc.is_paused():
+            self._vc.resume()
+            self._vc.stop()
+            return
+
         if not self.queue:
             return
 
@@ -58,6 +65,10 @@ class Manager:
 
     def play(self, callback):
         if self._vc.is_playing():
+            return
+
+        if self._vc.is_paused():
+            self._vc.resume()
             return
 
         if not self.queue:
@@ -80,3 +91,43 @@ class Manager:
         head, *tail = self.queue
         random.shuffle(tail)
         self.queue = [head, *tail]
+
+    def pause(self, callback):
+        if not self._vc.is_playing() or self._vc.is_paused():
+            return
+
+        self._vc.pause()
+        callback()
+
+    @property
+    def is_paused(self):
+        return self._vc.is_paused()
+
+    def interruption(self, message, callback):
+        buffer = BytesIO()
+        tts = gTTS(message, lang='pt-br', slow=False)
+        tts.write_to_fp(buffer)
+        buffer.seek(0)
+
+        is_playing = self._vc.is_playing()
+
+        def after(_):
+            buffer.close()
+            if is_playing:
+                self._vc.resume()
+            callback()
+
+        if is_playing:
+            self._vc.pause()
+            player = AudioPlayer(
+                discord.FFmpegOpusAudio(buffer, pipe=True),
+                self._vc,
+                after=after
+            )
+            player.start()
+            return
+
+        self._vc.play(
+            discord.FFmpegOpusAudio(buffer, pipe=True),
+            after=after
+        )

@@ -1,16 +1,12 @@
-import asyncio
-from collections import deque
-from contextlib import asynccontextmanager
-import sys
+import os
 import random
-from tempfile import TemporaryFile
+import sys
 from typing import Iterable, Optional
 
 import discord
 from discord.ext import commands
 from discord.errors import NotFound
 from dotenv import dotenv_values
-from gtts import gTTS
 
 from base import Config
 from downloader import Downloader
@@ -64,9 +60,11 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
         voice_state = ctx.author.voice
         vc = await voice_state.channel.connect()
         managers[id] = Manager(Downloader(), vc)
+
         # welcome sound
-        managers[id].search_add(welcome_sounds[random.randrange(0, len(welcome_sounds))], bot_author)
-        managers[id].play(build_callback(ctx))
+        if not os.getenv("DISABLE_WELCOME_SOUND"):
+            managers[id].search_add(welcome_sounds[random.randrange(0, len(welcome_sounds))], bot_author)
+            managers[id].play(build_callback(ctx))
 
     return managers[id]
 
@@ -87,7 +85,7 @@ async def cmd_disconnect(ctx: commands.Context, *_):
 async def cmd_connect(ctx: commands.Context, *_):
     await get_manager(ctx)
     await update_status(ctx)
-    
+
 
 @bot.command("queue", aliases=["q", "QUEUE", "Q"],
              help="Mostra a fila de músicas")
@@ -101,10 +99,8 @@ async def cmd_queue(ctx: commands.Context, *_):
         embed.add_field(name='Nada pra ver aqui, circulando.', value="(◐ω◑ )")
         await ctx.send(embed=embed)
         return
-    
-    queue_list = []
-    for i, item in enumerate(manager.queue):
-        queue_list.append(f"‣ {i+1:02d} - **{item.title[:50]}** - por {item.author}")
+
+    queue_list = build_queue_list(manager)
 
     def split(queue_list: list) -> Iterable[str]:
         queue_str = ""
@@ -144,19 +140,25 @@ async def cmd_play(ctx: commands.Context, *args):
         return
 
     query = ' '.join(args)
-    queue_items = manager.search_add(query, str(ctx.author))
+    if query:
+        queue_items = manager.search_add(query, str(ctx.author))
 
-    if len(queue_items) == 1:
-        await ctx.send(f'🎵 {queue_items[0].title} adicionada na queue ≧◡≦')
-    elif len(queue_items) > 1:
-        title_items = queue_items[:3]
-        titles = ", ".join([qi.title for qi in title_items])
-        await ctx.send(f'🎵 {titles} e mais {len(queue_items) - len(title_items)} adicionadas na queue ≧◡≦')
+        if len(queue_items) == 1:
+            await ctx.send(f'🎵 {queue_items[0].title} adicionada na queue ≧◡≦')
+        elif len(queue_items) > 1:
+            title_items = queue_items[:3]
+            titles = ", ".join([qi.title for qi in title_items])
+            await ctx.send(f'🎵 {titles} e mais {len(queue_items) - len(title_items)} adicionadas na queue ≧◡≦')
+        else:
+            await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')
+
+        if not manager.is_paused:
+            manager.play(build_callback(ctx))
+
     else:
-        await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')
+        manager.play(build_callback(ctx))
 
     await update_status(ctx)
-    manager.play(build_callback(ctx))
 
 
 @bot.command("insert", aliases=["INSERT", "inject", "INJECT", "i", "I", "playnext", "PLAYNEXT", "pn", "PN"],
@@ -178,8 +180,9 @@ async def cmd_insert(ctx: commands.Context, *args):
     else:
         await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')
 
-    await update_status(ctx)
     manager.play(build_callback(ctx))
+    await update_status(ctx)
+
 
 @bot.command("shuffle", aliases=["SHUFFLE"], help="Randomiza a playlist atual")
 async def cmd_shuffle(ctx: commands.Context, *args):
@@ -216,6 +219,18 @@ async def cmd_skip(ctx: commands.Context, *args):
         await ctx.send(f'🎵 Pulando {n} músicas')
         manager.next_n(n, build_callback(ctx))
 
+    await update_status(ctx)
+
+
+@bot.command("pause", aliases=["PAUSE"],
+             help="Pausa a reprodução do BOT")
+async def cmd_pause(ctx: commands.Context, *_):
+    manager = await get_manager(ctx)
+    if not manager:
+        return
+
+    await ctx.send('Pausando (>‘o’)>')
+    manager.pause(build_callback(ctx))
     await update_status(ctx)
 
 
@@ -258,59 +273,25 @@ async def cmd_cafe(ctx: commands.Context, *_):
     await update_status(ctx)
 
 
-@bot.command("fala", aliases=["FALA"], help="Diz alguma coisa no canal de voz por TTS")
-async def say(ctx):
-    message_queue = deque([])
-    can_speak = True
-    if not can_speak:
+@bot.command("say", aliases=["SAY", "fala", "FALA", "fale", "FALE", "diz", "DIZ"],
+             help="Diz alguma coisa no canal de voz por TTS")
+async def cmd_say(ctx, *args):
+    manager = await get_manager(ctx)
+    if not manager:
         return
-    
-    message = ctx.message.content[5:]
-    usernick = ctx.message.author.display_name
-    message = f"{usernick} disse {message}"
-    try:
-        vc = ctx.message.guild.voice_client
-        f = TemporaryFile()
-        tts = gTTS(message, lang='pt-br', slow=False)
-        tts.write_to_fp(f)
-        f.seek(0)
-        if not vc or not vc.is_playing():
-            vc.play(discord.FFmpegPCMAudio(f, pipe=True))
-            await wait_for_audio(vc)
-        else:
-            message_queue.append(message)
-            while vc.is_playing():
-                await asyncio.sleep(0.1)
-            message = message_queue.popleft()
-            tts = gTTS(message, lang='pt-br', slow=False)
-            tts.write_to_fp(f)
-            f.seek(0)
-            vc.play(discord.FFmpegPCMAudio(f, pipe=True))
-            await wait_for_audio(vc)
-        f.close()
-    except (TypeError, AttributeError):
-        try:
-            f = TemporaryFile()
-            tts = gTTS(message, lang='pt-br', slow=False)
-            tts.write_to_fp(f)
-            f.seek(0)
-            channel = ctx.message.author.voice.channel
-            vc = await channel.connect()
-            vc.play(discord.FFmpegPCMAudio(f, pipe=True))
-            await wait_for_audio(vc)
-            f.close()
-        except (AttributeError, TypeError):
-            await ctx.send("Eu não estou em um canal de voz!")
 
-async def wait_for_audio(vc):
-    while vc.is_playing():
-        await asyncio.sleep(0.1)
+    message = " ".join(args)
+    user_name = ctx.message.author.display_name
+    complete_message = f'{user_name} disse "{message}"'
+    manager.interruption(complete_message, build_callback(ctx))
 
 
 @bot.event
-async def on_voice_state_update(member: discord.member.Member,
-                                before: discord.VoiceState,
-                                after: discord.VoiceState):
+async def on_voice_state_update(
+        member: discord.member.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState
+    ):
     # disconects when everyone leaves
     if not before.channel:
         return
@@ -334,32 +315,58 @@ class Buttons(discord.ui.View):
         self.manager = manager
         self.callback = callback
 
+    @discord.ui.button(label="⏯️", style=discord.ButtonStyle.gray, custom_id="pause")
+    async def pause_button(self, *args):
+        await self.ok(args)
+        if self.manager.is_paused:
+            self.manager.play(self.callback)
+        else:
+            self.manager.pause(self.callback)
+        self.callback()
+
     @discord.ui.button(label="🔀", style=discord.ButtonStyle.gray, custom_id="shuffle")
-    async def prev_button(self, *args):
-        interaction, button = sort_params(args, discord.Interaction, discord.ui.Button)
+    async def shuffle_button(self, *args):
+        await self.ok(args)
         self.manager.shuffle()
+        self.callback()
+
+    @discord.ui.button(label="⏭️", style=discord.ButtonStyle.gray, custom_id="next")
+    async def next_button(self, *args):
+        await self.ok(args)
+        self.manager.next(self.callback)
+        self.callback()
+
+    async def ok(self, args):
+        interaction, _ = sort_params(args, discord.Interaction, discord.ui.Button)
         try:
             await interaction.response.edit_message()
         except NotFound:
             pass
 
-    @discord.ui.button(label="⏭️", style=discord.ButtonStyle.gray, custom_id="next")
-    async def next_button(self, *args):
-        interaction, button = sort_params(args, discord.Interaction, discord.ui.Button)
-        self.manager.next(self.callback)
-        self.callback()
-        try:
-            await interaction.response.edit_message()
-        except NotFound:
-            pass
+
+def build_queue_list(manager: Manager) -> list[str]:
+    status = manager.is_paused and "⏸️" or "▶️"
+
+    queue_list = []
+    for i, item in enumerate(manager.queue):
+        indicator = ""
+        if i == 0:
+            indicator = status
+        queue_list.append(f"{indicator}‣ {i:02d} - **{item.title[:50]}** - por {item.author}")
+    return queue_list
 
 
 async def update_status(ctx: commands.Context):
     manager = await get_manager(ctx)
-    if manager.queue and manager.queue[0].author != bot_author:
+    status = manager.is_paused and "⏸️" or "▶️"
+
+    next = build_queue_list(manager)[1:5]
+    next_str = "\n".join(next)
+
+    if manager.queue:
         queue_item = manager.queue[0]
         title = queue_item.title
-        state = f"Adicionado por {queue_item.author}"
+        state = f"{status} - Adicionado por {queue_item.author}\n\n{next_str}"
         buttons = Buttons(manager, build_callback(ctx))
         await bot.change_presence(
             activity=discord.Activity(
@@ -370,7 +377,7 @@ async def update_status(ctx: commands.Context):
         )
     else:
         title = "Fila zerada. Adicione músicas com /play <nome/link da música>"
-        state = ""
+        state = "⏹️"
         buttons = None
         await bot.change_presence(
             activity=discord.Activity(
