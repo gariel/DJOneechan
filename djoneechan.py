@@ -1,11 +1,16 @@
+import asyncio
+from collections import deque
+from contextlib import asynccontextmanager
 import sys
 import random
+from tempfile import TemporaryFile
 from typing import Iterable, Optional
 
 import discord
 from discord.ext import commands
 from discord.errors import NotFound
 from dotenv import dotenv_values
+from gtts import gTTS
 
 from base import Config
 from downloader import Downloader
@@ -253,6 +258,55 @@ async def cmd_cafe(ctx: commands.Context, *_):
     await update_status(ctx)
 
 
+@bot.command("fala", aliases=["FALA"], help="Diz alguma coisa no canal de voz por TTS")
+async def say(ctx):
+    message_queue = deque([])
+    can_speak = True
+    if not can_speak:
+        return
+    
+    message = ctx.message.content[5:]
+    usernick = ctx.message.author.display_name
+    message = f"{usernick} disse {message}"
+    try:
+        vc = ctx.message.guild.voice_client
+        f = TemporaryFile()
+        tts = gTTS(message, lang='pt-br', slow=False)
+        tts.write_to_fp(f)
+        f.seek(0)
+        if not vc or not vc.is_playing():
+            vc.play(discord.FFmpegPCMAudio(f, pipe=True))
+            await wait_for_audio(vc)
+        else:
+            message_queue.append(message)
+            while vc.is_playing():
+                await asyncio.sleep(0.1)
+            message = message_queue.popleft()
+            tts = gTTS(message, lang='pt-br', slow=False)
+            tts.write_to_fp(f)
+            f.seek(0)
+            vc.play(discord.FFmpegPCMAudio(f, pipe=True))
+            await wait_for_audio(vc)
+        f.close()
+    except (TypeError, AttributeError):
+        try:
+            f = TemporaryFile()
+            tts = gTTS(message, lang='pt-br', slow=False)
+            tts.write_to_fp(f)
+            f.seek(0)
+            channel = ctx.message.author.voice.channel
+            vc = await channel.connect()
+            vc.play(discord.FFmpegPCMAudio(f, pipe=True))
+            await wait_for_audio(vc)
+            f.close()
+        except (AttributeError, TypeError):
+            await ctx.send("Eu não estou em um canal de voz!")
+
+async def wait_for_audio(vc):
+    while vc.is_playing():
+        await asyncio.sleep(0.1)
+
+
 @bot.event
 async def on_voice_state_update(member: discord.member.Member,
                                 before: discord.VoiceState,
@@ -315,7 +369,7 @@ async def update_status(ctx: commands.Context):
             )
         )
     else:
-        title = "<no music>"
+        title = "Fila zerada. Adicione músicas com /play <nome/link da música>"
         state = ""
         buttons = None
         await bot.change_presence(
