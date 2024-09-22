@@ -39,6 +39,7 @@ welcome_sounds = [
     "https://www.youtube.com/watch?v=MUL5w91dzbo", # Goofy Yell
     "https://www.youtube.com/watch?v=AtbMnixO2nc", # Tourettes Guy hits his head
     "https://www.youtube.com/watch?v=UINZ8oRDIkU", # Rapaz é o seguinte, cambio desligo
+    "https://www.youtube.com/watch?v=opBFaCS_PV4", # Peido
 ]
 
 
