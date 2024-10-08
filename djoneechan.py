@@ -1,3 +1,4 @@
+import asyncio
 import os
 import random
 import sys
@@ -40,6 +41,7 @@ welcome_sounds = [
     "https://www.youtube.com/watch?v=AtbMnixO2nc", # Tourettes Guy hits his head
     "https://www.youtube.com/watch?v=UINZ8oRDIkU", # Rapaz é o seguinte, cambio desligo
     "https://www.youtube.com/watch?v=opBFaCS_PV4", # Peido
+    "https://www.youtube.com/watch?v=ABfj2JDEw9Q", # Kaguya ara ara
 ]
 
 
@@ -174,10 +176,12 @@ async def cmd_insert(ctx: commands.Context, *args):
 
     if len(queue_items) == 1:
         await ctx.send(f'🎵 {queue_items[0].title} injetada como próxima da fila ヽ(゜∇゜)ノ')
+
     elif len(queue_items) > 1:
         title_items = queue_items[:3]
         titles = ", ".join([qi.title for qi in title_items])
         await ctx.send(f'🎵 {titles} e mais {len(queue_items) - len(title_items)} inseridas como próximas na queue ヽ(゜∇゜)ノ')
+
     else:
         await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')
 
@@ -269,7 +273,7 @@ async def cmd_cafe(ctx: commands.Context, *_):
 
 @bot.command("ping", aliases=["PING"],
              help="Response test")
-async def cmd_cafe(ctx: commands.Context, *_):
+async def cmd_ping(ctx: commands.Context, *_):
     await ctx.send('Pong 🏓')
     await update_status(ctx)
 
@@ -285,6 +289,19 @@ async def cmd_say(ctx, *args):
     user_name = ctx.message.author.display_name
     complete_message = f'{user_name} disse "{message}"'
     manager.interruption(complete_message, build_callback(ctx))
+
+
+@bot.command("nuke", help="kill the bot gun 🧨")
+async def cmd_nuke(ctx, *args):
+    message = "Matando o serviço powpowpow"
+    await ctx.send(message)
+
+    manager = await get_manager(ctx)
+    manager and manager.interruption(message, build_callback(ctx))
+
+    await ctx.send("🧨 -> 🪦")
+    await asyncio.sleep(2)
+    exit(1)
 
 
 @bot.event
@@ -359,8 +376,10 @@ def build_queue_list(manager: Manager) -> list[str]:
 
 async def update_status(ctx: commands.Context):
     manager = await get_manager(ctx)
-    status = manager.is_paused and "⏸️" or "▶️"
+    if not manager:
+        return
 
+    status = manager.is_paused and "⏸️" or "▶️"
     next = build_queue_list(manager)[1:5]
     next_str = "\n".join(next)
 
