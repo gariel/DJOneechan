@@ -1,4 +1,5 @@
 import json
+from json import JSONDecodeError
 from typing import Iterable
 
 import requests
@@ -72,7 +73,11 @@ def _parse(url: str, is_search: bool) -> Iterable[QueueItem]:
     )
     end = response.index("};", start) + 1
     json_str = response[start:end]
-    data = json.loads(json_str)
+    try:
+        data = json.loads(json_str)
+    except JSONDecodeError:
+        print("================ JSONDecodeError,", json_str)
+        return
 
     if is_search:
         yield _search(data)
