@@ -291,7 +291,7 @@ async def cmd_say(ctx, *args):
     manager.interruption(complete_message, build_callback(ctx))
 
 
-@bot.command("nuke", help="kill the bot gun 🧨")
+@bot.command("nuke", help="Mata o bot 🧨")
 async def cmd_nuke(ctx, *args):
     message = "Matando o serviço powpowpow"
     await ctx.send(message)
