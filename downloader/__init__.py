@@ -1,10 +1,10 @@
 import yt_dlp
-from base import QueueItem
-import youtubeextractor
+from downloader import youtubeextractor
+from models.queue_item import MediaInfo
 
 
 class Downloader:
-    def get_queue_items(self, search: str) -> list[QueueItem]:
+    def get_queue_items(self, search: str) -> list[MediaInfo]:
         return youtubeextractor.extract(search)
 
     def get_media_url(self, url: str) -> str:

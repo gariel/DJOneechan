@@ -4,7 +4,8 @@ from typing import Iterable
 
 import requests
 import urllib
-from base import QueueItem
+
+from models.queue_item import MediaInfo
 
 
 def _search(data):
@@ -17,14 +18,14 @@ def _search(data):
                 url = f"https://www.youtube.com/watch?v={id}"
                 title = video_data.get("title", {}).get("runs", [[{}]])[0].get("text", None)
 
-                return QueueItem(
+                return MediaInfo(
                     title=title,
                     url=url,
                 )
     return None
 
 
-def _video(url: str, data: dict) -> QueueItem:
+def _video(url: str, data: dict) -> MediaInfo:
     title = "unknown"
     for content in data["contents"]["twoColumnWatchNextResults"]["results"]["results"]["contents"]:
         if "videoPrimaryInfoRenderer" in content:
@@ -32,16 +33,16 @@ def _video(url: str, data: dict) -> QueueItem:
             title = video["title"]["runs"][0]["text"]
             break
     
-    return QueueItem(
+    return MediaInfo(
         title=title,
         url=url,
     )
 
 
-def _playlist(data: dict) -> list[QueueItem]:
+def _playlist(data: dict) -> list[MediaInfo]:
     playlist = data["contents"]["twoColumnWatchNextResults"]["playlist"]["playlist"]
 
-    items : list[QueueItem] = []
+    items : list[MediaInfo] = []
     for video in playlist["contents"]:
         if "playlistPanelVideoRenderer" in video.keys():
             video_data = video.get("playlistPanelVideoRenderer", {})
@@ -50,7 +51,7 @@ def _playlist(data: dict) -> list[QueueItem]:
             title = str(video_data.get("title", {}).get("simpleText", id))
             url=f"https://www.youtube.com/watch?v={id}"
 
-            items.append(QueueItem(
+            items.append(MediaInfo(
                 title=title,
                 url=url,
             ))
@@ -58,7 +59,7 @@ def _playlist(data: dict) -> list[QueueItem]:
     return items
 
 
-def _parse(url: str, is_search: bool) -> Iterable[QueueItem]:
+def _parse(url: str, is_search: bool) -> Iterable[MediaInfo]:
     if "music.youtube" in url:
         url = url.replace("music.youtube", "youtube")
 
@@ -89,7 +90,7 @@ def _parse(url: str, is_search: bool) -> Iterable[QueueItem]:
         yield _video(url, data)
 
 
-def extract(text: str) -> list[QueueItem]:
+def extract(text: str) -> list[MediaInfo]:
     is_search = not urllib.parse.urlparse(text).scheme
 
     if is_search:
