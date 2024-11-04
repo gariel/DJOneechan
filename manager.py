@@ -4,15 +4,18 @@ from io import BytesIO
 import discord
 from discord.errors import ClientException
 from discord.voice_client import AudioPlayer
-from base import QueueItem
+from models.queue_item import QueueItem
 from downloader import Downloader
 from gtts import gTTS
 
+from repositories.history import HistoryRepository
+
 
 class Manager:
-    def __init__(self, downloader: Downloader, vc: discord.VoiceClient):
+    def __init__(self, downloader: Downloader, history_repo: HistoryRepository, vc: discord.VoiceClient):
         self.queue: list[QueueItem] = []
         self._downloader = downloader
+        self._history_repo = history_repo
         self._vc = vc
         
     def search_add(self, search: str, author: str) -> list[QueueItem]:
@@ -21,13 +24,20 @@ class Manager:
     def search_add_next(self, search: str, author: str) -> list[QueueItem]:
         return self._search_add(search, author, True)
     
-    def _search_add(self, search: str, author: str, next: bool) -> list[QueueItem]:
-        queue_items = self._downloader.get_queue_items(search)
+    def _search_add(self, search: str, author: str, is_next: bool) -> list[QueueItem]:
+        media_infos = self._downloader.get_queue_items(search)
 
-        for qi in queue_items:
-            qi.author = author
+        queue_items = [
+            QueueItem(
+                title=mi.title,
+                url=mi.url,
+                request=search,
+                author=author
+            )
+            for mi in media_infos
+        ]
 
-        if not self.queue or not next:
+        if not self.queue or not is_next:
             self.queue.extend(queue_items)
         else:
             self.queue = [self.queue[0], *queue_items, *self.queue[1:]]
@@ -63,7 +73,7 @@ class Manager:
             self.queue = self.queue[n-1:]  # TODO: gambiarra
         self.next(callback)
 
-    def play(self, callback):
+    def play(self, callback, skip_history=False):
         if self._vc.is_playing():
             return
 
@@ -81,6 +91,8 @@ class Manager:
         audio = discord.FFmpegOpusAudio(url)
         try:
             self._vc.play(audio, after=lambda _: self._internal_next(callback))
+            if not skip_history:
+                self._history_repo.add_history(queue_item)
         except ClientException:
             pass
 
@@ -105,7 +117,7 @@ class Manager:
 
     def interruption(self, message, callback):
         buffer = BytesIO()
-        tts = gTTS(message, lang='pt-br', slow=False)
+        tts = gTTS(message, lang='pt-br', lang_check=False)
         tts.write_to_fp(buffer)
         buffer.seek(0)
 

@@ -1,18 +1,23 @@
 import asyncio
+import datetime
 import os
 import random
 import sys
 from typing import Iterable, Optional
 
 import discord
+import pymongo
 from discord.ext import commands
 from discord.errors import NotFound
 from dotenv import dotenv_values
+from pymongo.synchronous.database import Database
 
-from base import Config
+import utils
+from models.config import Config
 from downloader import Downloader
 from manager import Manager
-
+from repositories.history import HistoryRepository
+from repositories.welcome_sounds import WelcomeSoundsRepository
 
 config = Config.create(dotenv_values(".env"))
 bot_author = "<bot>"
@@ -26,23 +31,56 @@ bot = commands.Bot(
     )
 )
 
+db: Optional[Database] = None
+if config.DB.is_valid:
+    db = pymongo.MongoClient(config.DB.connection_string)[config.DB.Database]
 
-welcome_sounds = [
-    "https://www.youtube.com/watch?v=AUU_YHWCRWQ", # Mourão Bom Dia
-    "https://www.youtube.com/watch?v=wCH3q2IsXVs", # The Bluetooth Device Is Ready To Pair
-    "https://www.youtube.com/watch?v=9MekjuKFtJo", # boraaa acorda fdp
-    "https://www.youtube.com/watch?v=aQyk2LG3KQI", # Você É Um Filho Da Puta He-Man
-    "https://www.youtube.com/watch?v=N9777WExvCc", # Among Us Impostor
-    "https://www.youtube.com/watch?v=0IAr0HhOVZo", # Samsung
-    "https://www.youtube.com/watch?v=0VtPgIX_Dbk", # It's Time to D-D-D-D DUEL!
-    "https://www.youtube.com/watch?v=I88S3jUeKkE", # Jesus Christ its jason bourne
-    "https://www.youtube.com/watch?v=0ynT_2DDBZg", # SOMEBODY TOUCHA MY SPAGHET
-    "https://www.youtube.com/watch?v=MUL5w91dzbo", # Goofy Yell
-    "https://www.youtube.com/watch?v=AtbMnixO2nc", # Tourettes Guy hits his head
-    "https://www.youtube.com/watch?v=UINZ8oRDIkU", # Rapaz é o seguinte, cambio desligo
-    "https://www.youtube.com/watch?v=opBFaCS_PV4", # Peido
-    "https://www.youtube.com/watch?v=ABfj2JDEw9Q", # Kaguya ara ara
-]
+history_repo = HistoryRepository(db)
+welcome_sounds_repo = WelcomeSoundsRepository(db)
+
+
+@bot.command("welcomesounds", aliases=["ws"], help="Lista os Welcome Sounds")
+async def cmd_welcome_sounds(ctx: commands.Context, *_):
+    await get_manager(ctx)
+    await ctx.send(utils.text_table(
+        header=["Title", "URL", "Author"],
+        data=[
+            [ws.title, ws.url, ws.author]
+            for ws in welcome_sounds_repo.get_all()
+        ]
+    ))
+    await update_status(ctx)
+
+@bot.command("top", aliases=[], help="Ranking de musicas")
+async def cmd_top_musics(ctx: commands.Context, *args):
+    await get_manager(ctx)
+    n = 5
+    if args:
+        n = utils.safe(int, args[0], 5)
+
+    initial_day = datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=12)
+    today = datetime.datetime.combine(
+        initial_day.date() + datetime.timedelta(hours=12),
+        datetime.datetime.min.time()
+    )
+
+    metrics = [
+        ("Top Hoje", history_repo.summarize_top(n, today)),
+        ("Top 7 dias", history_repo.summarize_top(n, today - datetime.timedelta(days=7))),
+        ("Top Mes", history_repo.summarize_top(n, datetime.datetime(year=today.year, month=today.month, day=1))),
+        ("Top Ano", history_repo.summarize_top(n, datetime.datetime(year=today.year, month=1, day=1))),
+    ]
+
+    for title, metric in metrics:
+        await ctx.send(f'## {title}')
+        await ctx.send(utils.text_table(
+            header=["Title", "Times", "Url"],
+            data=[
+                [m.title, str(m.times), m.url]
+                for m in metric
+            ]
+        ))
+    await update_status(ctx)
 
 
 managers: dict[int, Manager] = {}
@@ -62,12 +100,13 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
     if id not in managers:
         voice_state = ctx.author.voice
         vc = await voice_state.channel.connect()
-        managers[id] = Manager(Downloader(), vc)
+        managers[id] = Manager(Downloader(), history_repo, vc)
 
-        # welcome sound
         if not os.getenv("DISABLE_WELCOME_SOUND"):
-            managers[id].search_add(welcome_sounds[random.randrange(0, len(welcome_sounds))], bot_author)
-            managers[id].play(build_callback(ctx))
+            welcome_sounds_urls = welcome_sounds_repo.get_all_urls()
+            random_index = random.randrange(0, len(welcome_sounds_urls))
+            managers[id].search_add(welcome_sounds_urls[random_index], bot_author)
+            managers[id].play(build_callback(ctx), skip_history=True)
 
     return managers[id]
 
