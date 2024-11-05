@@ -95,6 +95,12 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
     member_ids = [member.id for member in ctx.author.voice.channel.members]
     if bot.user.id not in member_ids and id in managers:
         await ctx.send('Você precisa estar no mesmo canal de voz para usar esse comando')
+        await ctx.send("\n".join([
+            f"Bot User ID: " + str(bot.user.id),
+            json.dumps(member_ids),
+            f"Guild ID: " + str(id),
+            json.dumps(list(managers.keys())),
+        ]))
         return None
 
     if id not in managers:
