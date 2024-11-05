@@ -92,7 +92,7 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
         await ctx.send('Você precisa estar em um canal de voz para usar esse comando')
         return None
 
-    member_ids = [member.id for member in ctx.author.voice.channel.members]
+    member_ids = [member.id for member in voice_state.channel.members]
     if bot.user.id not in member_ids and id in managers:
         await ctx.send('Você precisa estar no mesmo canal de voz para usar esse comando')
         await ctx.send("\n".join([
@@ -101,7 +101,9 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
             f"Guild ID: " + str(id),
             json.dumps(list(managers.keys())),
         ]))
-        return None
+        await ctx.guild.voice_client.disconnect()
+        if id in managers:
+            del managers[ctx.guild.id]
 
     if id not in managers:
         voice_state = ctx.author.voice
