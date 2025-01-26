@@ -96,20 +96,19 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
     member_ids = [member.id for member in voice_state.channel.members]
     if bot.user.id not in member_ids and id in managers:
         await ctx.send('Você precisa estar no mesmo canal de voz para usar esse comando')
-        await ctx.send("\n".join([
-            f"Bot User ID: " + str(bot.user.id),
-            json.dumps(member_ids),
-            f"Guild ID: " + str(id),
-            json.dumps(list(managers.keys())),
-        ]))
-        await ctx.guild.voice_client.disconnect()
-        if id in managers:
+        try:
+            voice_client = ctx.guild.voice_client
+            if not voice_client:
+                await voice_client.disconnect(force=True)
             del managers[ctx.guild.id]
+        except Exception as e:
+            await ctx.send('Deu ruim tentando desconectar o bot: ' + str(e))
+            exit(1)
 
     if id not in managers:
         voice_state = ctx.author.voice
         vc = await voice_state.channel.connect()
-        managers[id] = Manager(Downloader(), history_repo, vc)
+        managers[id] = Manager(Downloader(config.CookieFile), history_repo, vc)
 
         if not os.getenv("DISABLE_WELCOME_SOUND"):
             welcome_sounds_urls = welcome_sounds_repo.get_all_urls()
@@ -124,7 +123,7 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
 async def cmd_disconnect(ctx: commands.Context, *_):
     voice_client = ctx.guild.voice_client
     if voice_client:
-        await voice_client.disconnect()
+        await voice_client.disconnect(force=True)
         await ctx.send("Disconnected from voice channel.")
         if ctx.guild.id in managers:
             del managers[ctx.guild.id]

@@ -38,6 +38,7 @@ class Config:
     Token: str
     Prefix: str
     Color: int
+    CookieFile: str
     DB: DBConfig
 
     @staticmethod
@@ -55,6 +56,7 @@ class Config:
             Token=env.get("BOT_TOKEN"),
             Prefix=env.get("BOT_PREFIX", "."),
             Color=Config.convert_color(env.get("BOT_COLOR")),
+            CookieFile=env.get("BOT_COOKIE_FILE"),
             DB=DBConfig(
                 Host=env.get("BOT_DB_HOST"),
                 Port=safe(int, env.get("BOT_DB_PORT"), default=0),
