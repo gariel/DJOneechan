@@ -10,6 +10,7 @@ from gtts import gTTS
 
 from repositories.history import HistoryRepository
 
+RECONNECTING_FFMPEG_OPTIONS = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2"
 
 class Manager:
     def __init__(self, downloader: Downloader, history_repo: HistoryRepository, vc: discord.VoiceClient):
@@ -88,7 +89,7 @@ class Manager:
 
         current = queue_item.url
         url = self._downloader.get_media_url(current)
-        audio = discord.FFmpegOpusAudio(url)
+        audio = discord.FFmpegOpusAudio(url, before_options=RECONNECTING_FFMPEG_OPTIONS)
         try:
             self._vc.play(audio, after=lambda _: self._internal_next(callback))
             if not skip_history:
