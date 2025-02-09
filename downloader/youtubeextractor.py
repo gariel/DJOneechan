@@ -25,9 +25,9 @@ def _search(data):
     return None
 
 
-def _video(url: str, data: dict) -> MediaInfo:
+def _video(url: str, results: dict) -> MediaInfo:
     title = "unknown"
-    for content in data["contents"]["twoColumnWatchNextResults"]["results"]["results"]["contents"]:
+    for content in results["contents"]:
         if "videoPrimaryInfoRenderer" in content:
             video = content["videoPrimaryInfoRenderer"]
             title = video["title"]["runs"][0]["text"]
@@ -39,9 +39,7 @@ def _video(url: str, data: dict) -> MediaInfo:
     )
 
 
-def _playlist(data: dict) -> list[MediaInfo]:
-    playlist = data["contents"]["twoColumnWatchNextResults"]["playlist"]["playlist"]
-
+def _playlist(playlist: dict) -> list[MediaInfo]:
     items : list[MediaInfo] = []
     for video in playlist["contents"]:
         if "playlistPanelVideoRenderer" in video.keys():
@@ -60,6 +58,9 @@ def _playlist(data: dict) -> list[MediaInfo]:
 
 
 def _parse(url: str, is_search: bool) -> Iterable[MediaInfo]:
+    if "youtube" not in url and "youtu.be" not in url:
+        return
+
     if "music.youtube" in url:
         url = url.replace("music.youtube", "youtube")
 
@@ -83,11 +84,14 @@ def _parse(url: str, is_search: bool) -> Iterable[MediaInfo]:
     if is_search:
         yield _search(data)
 
-    elif "&list=" in url:
-        for video in _playlist(data):
-            yield video
     else:
-        yield _video(url, data)
+        next_results = data["contents"]["twoColumnWatchNextResults"]
+        if "playlist" in next_results:
+            playlist = next_results["playlist"]["playlist"]
+            yield from _playlist(playlist)
+        else:
+            results = next_results["results"]["results"]
+            yield _video(url, results)
 
 
 def extract(text: str) -> list[MediaInfo]:
