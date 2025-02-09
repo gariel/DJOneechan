@@ -4,7 +4,6 @@ import os
 import random
 import sys
 from typing import Iterable, Optional
-import json
 
 import discord
 import pymongo
@@ -103,7 +102,8 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
             del managers[ctx.guild.id]
         except Exception as e:
             await ctx.send('Deu ruim tentando desconectar o bot: ' + str(e))
-            exit(1)
+            await asyncio.sleep(1)
+            await bot.close()
 
     if id not in managers:
         voice_state = ctx.author.voice
@@ -340,16 +340,55 @@ async def cmd_say(ctx, *args):
 
 @bot.command("nuke", help="Mata o bot 🧨")
 async def cmd_nuke(ctx, *args):
-    message = "Matando o serviço powpowpow"
-    await ctx.send(message)
+    await ctx.send("Matando o serviço powpowpow 🧨 -> 🪦")
+    await asyncio.sleep(1)
+    await bot.close()
 
-    manager = await get_manager(ctx)
-    manager and manager.interruption(message, build_callback(ctx))
 
-    await ctx.send("🧨 -> 🪦")
-    await asyncio.sleep(2)
-    exit(1)
+if config.EnableRunAdvanced:
+    def aw(x):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
+        result = loop.run_until_complete(x)
+        return result
+
+    async def async_evaluate(command: str, context: dict):
+        execution = lambda: eval(command, globals(), context)
+        return await asyncio.to_thread(execution)
+
+    @bot.command("run_advanced", help="advanced stuff")
+    async def cmd_run_advanced(ctx, *args):
+        command = " ".join(args)
+        context = {
+            "manager": await get_manager(ctx),
+            "callback": build_callback(ctx),
+            "ctx": ctx,
+            "discord": discord,
+            "color": config.Color,
+            "bot": bot,
+            "db": db,
+            "history_repo": history_repo,
+            "welcome_sounds_repo": welcome_sounds_repo,
+            "datetime": datetime,
+            "utils": utils,
+            "aw": aw, # await async_method() -> aw(async_method())
+        }
+
+        if command == "vars":
+            embed = discord.Embed(color=config.Color, title="Run Advanced vars")
+            for name, value in context:
+                embed.add_field(name=name, value=type(value).__name__)
+            await ctx.send(embed=embed)
+            return
+
+        result = await async_evaluate(command, context)
+        embed = discord.Embed(color=config.Color, title="Run Advanced")
+        embed.add_field(name="result", value=result)
+        await ctx.send(embed=embed)
 
 @bot.event
 async def on_voice_state_update(
