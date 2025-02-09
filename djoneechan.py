@@ -103,7 +103,7 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
         except Exception as e:
             await ctx.send('Deu ruim tentando desconectar o bot: ' + str(e))
             await asyncio.sleep(1)
-            exit(1)
+            await bot.close()
 
     if id not in managers:
         voice_state = ctx.author.voice
@@ -342,7 +342,7 @@ async def cmd_say(ctx, *args):
 async def cmd_nuke(ctx, *args):
     await ctx.send("Matando o serviço powpowpow 🧨 -> 🪦")
     await asyncio.sleep(1)
-    exit(1)
+    await bot.close()
 
 
 if config.EnableRunAdvanced:
@@ -358,7 +358,7 @@ if config.EnableRunAdvanced:
 
     async def async_evaluate(command: str, context: dict):
         execution = lambda: eval(command, globals(), context)
-        return asyncio.to_thread(execution)
+        return await asyncio.to_thread(execution)
 
     @bot.command("run_advanced", help="advanced stuff")
     async def cmd_run_advanced(ctx, *args):
