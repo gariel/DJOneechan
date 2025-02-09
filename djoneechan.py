@@ -4,7 +4,6 @@ import os
 import random
 import sys
 from typing import Iterable, Optional
-import json
 
 import discord
 import pymongo
@@ -103,6 +102,7 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
             del managers[ctx.guild.id]
         except Exception as e:
             await ctx.send('Deu ruim tentando desconectar o bot: ' + str(e))
+            await asyncio.sleep(1)
             exit(1)
 
     if id not in managers:
@@ -340,14 +340,8 @@ async def cmd_say(ctx, *args):
 
 @bot.command("nuke", help="Mata o bot 🧨")
 async def cmd_nuke(ctx, *args):
-    message = "Matando o serviço powpowpow"
-    await ctx.send(message)
-
-    manager = await get_manager(ctx)
-    manager and manager.interruption(message, build_callback(ctx))
-
-    await ctx.send("🧨 -> 🪦")
-    await asyncio.sleep(2)
+    await ctx.send("Matando o serviço powpowpow 🧨 -> 🪦")
+    await asyncio.sleep(1)
     exit(1)
 
 
