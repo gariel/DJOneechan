@@ -40,6 +40,7 @@ class Config:
     Color: int
     CookieFile: str
     DB: DBConfig
+    EnableRunAdvanced: bool
 
     @staticmethod
     def convert_color(colorstr: str) -> int:
@@ -57,6 +58,7 @@ class Config:
             Prefix=env.get("BOT_PREFIX", "."),
             Color=Config.convert_color(env.get("BOT_COLOR")),
             CookieFile=env.get("BOT_COOKIE_FILE"),
+            EnableRunAdvanced=env.get("BOT_ENABLE_RUN_ADVANCED_COMMANDS").lower() == "true",
             DB=DBConfig(
                 Host=env.get("BOT_DB_HOST"),
                 Port=safe(int, env.get("BOT_DB_PORT"), default=0),
