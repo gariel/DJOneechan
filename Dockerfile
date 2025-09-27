@@ -1,4 +1,4 @@
-FROM python:3.12
+FROM python
 
 WORKDIR /opt/bot
 RUN apt update && apt install -y ffmpeg
