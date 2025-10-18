@@ -1,0 +1,5 @@
+services:
+  djoneechan:
+    build: .
+    volumes:
+      - ./.env:/opt/bot/.env
