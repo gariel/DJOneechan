@@ -12,14 +12,14 @@ class Downloader:
 
     def get_media_url(self, url: str) -> str | None:
         options = {
-            # 'format': "worstaudio",
-            # 'source_address': '0.0.0.0',
             'default_search': 'ytsearch',
             'outtmpl': '%(id)s.%(ext)s',
             'noplaylist': True,
             'allow_playlist_files': False,
             'paths': {'home': './dl/'},
             'extractor_args': {'youtube': {'player_client': ['web_music']}},
+            'js_runtimes': {'deno': {'path': None}},
+            'remote_components': ['ejs:github'],
         }
 
         if self.cookie_file:

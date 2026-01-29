@@ -124,11 +124,11 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
         vc = await voice_state.channel.connect()
         managers[id] = Manager(Downloader(config.CookieFile), history_repo, vc)
 
-        if not os.getenv("DISABLE_WELCOME_SOUND"):
-            welcome_sounds_urls = welcome_sounds_repo.get_all_urls()
-            random_index = random.randrange(0, len(welcome_sounds_urls))
-            managers[id].search_add(welcome_sounds_urls[random_index], bot_author)
-            managers[id].play(build_callback(ctx), skip_history=True)
+        # if not os.getenv("DISABLE_WELCOME_SOUND"):
+        #     welcome_sounds_urls = welcome_sounds_repo.get_all_urls()
+        #     random_index = random.randrange(0, len(welcome_sounds_urls))
+        #     managers[id].search_add(welcome_sounds_urls[random_index], bot_author)
+        #     managers[id].play(build_callback(ctx), skip_history=True)
 
     return managers[id]
 
