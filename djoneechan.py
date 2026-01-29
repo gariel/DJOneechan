@@ -24,11 +24,8 @@ bot_author = "<bot>"
 bot = commands.Bot(
     command_prefix=config.Prefix,
     intents=discord.Intents(
-        voice_states=True,
-        guilds=True,
-        guild_messages=True,
-        message_content=True
-    )
+        voice_states=True, guilds=True, guild_messages=True, message_content=True
+    ),
 )
 
 db: Optional[Database] = None
@@ -42,14 +39,16 @@ welcome_sounds_repo = WelcomeSoundsRepository(db)
 @bot.command("welcomesounds", aliases=["ws"], help="Lista os Welcome Sounds")
 async def cmd_welcome_sounds(ctx: commands.Context, *_):
     await get_manager(ctx)
-    await ctx.send(utils.text_table(
-        header=["Title", "URL", "Author"],
-        data=[
-            [ws.title, ws.url, ws.author]
-            for ws in welcome_sounds_repo.get_all()
-        ]
-    ))
+    await ctx.send(
+        utils.text_table(
+            header=["Title", "URL", "Author"],
+            data=[
+                [ws.title, ws.url, ws.author] for ws in welcome_sounds_repo.get_all()
+            ],
+        )
+    )
     await update_status(ctx)
+
 
 @bot.command("top", aliases=[], help="Ranking de musicas")
 async def cmd_top_musics(ctx: commands.Context, *args):
@@ -60,48 +59,63 @@ async def cmd_top_musics(ctx: commands.Context, *args):
 
     initial_day = datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=12)
     today = datetime.datetime.combine(
-        initial_day.date() + datetime.timedelta(hours=12),
-        datetime.datetime.min.time()
+        initial_day.date() + datetime.timedelta(hours=12), datetime.datetime.min.time()
     )
 
     metrics = [
         ("Top Hoje", history_repo.summarize_top(n, today)),
-        ("Top 7 dias", history_repo.summarize_top(n, today - datetime.timedelta(days=7))),
-        ("Top Mes", history_repo.summarize_top(n, datetime.datetime(year=today.year, month=today.month, day=1))),
-        ("Top Ano", history_repo.summarize_top(n, datetime.datetime(year=today.year, month=1, day=1))),
+        (
+            "Top 7 dias",
+            history_repo.summarize_top(n, today - datetime.timedelta(days=7)),
+        ),
+        (
+            "Top Mes",
+            history_repo.summarize_top(
+                n, datetime.datetime(year=today.year, month=today.month, day=1)
+            ),
+        ),
+        (
+            "Top Ano",
+            history_repo.summarize_top(
+                n, datetime.datetime(year=today.year, month=1, day=1)
+            ),
+        ),
     ]
 
     for title, metric in metrics:
-        await ctx.send(f'## {title}')
-        await ctx.send(utils.text_table(
-            header=["Title", "Times", "Url"],
-            data=[
-                [m.title, str(m.times), m.url]
-                for m in metric
-            ]
-        ))
+        await ctx.send(f"## {title}")
+        await ctx.send(
+            utils.text_table(
+                header=["Title", "Times", "Url"],
+                data=[[m.title, str(m.times), m.url] for m in metric],
+            )
+        )
     await update_status(ctx)
 
 
 managers: dict[int, Manager] = {}
+
+
 async def get_manager(ctx: commands.Context) -> Optional[Manager]:
     global managers
     id = ctx.guild.id
     voice_state = ctx.author.voice
     if voice_state is None:
-        await ctx.send('Você precisa estar em um canal de voz para usar esse comando')
+        await ctx.send("Você precisa estar em um canal de voz para usar esse comando")
         return None
 
     member_ids = [member.id for member in voice_state.channel.members]
     if bot.user.id not in member_ids and id in managers:
-        await ctx.send('Você precisa estar no mesmo canal de voz para usar esse comando')
+        await ctx.send(
+            "Você precisa estar no mesmo canal de voz para usar esse comando"
+        )
         try:
             voice_client = ctx.guild.voice_client
             if not voice_client:
                 await voice_client.disconnect(force=True)
             del managers[ctx.guild.id]
         except Exception as e:
-            await ctx.send('Deu ruim tentando desconectar o bot: ' + str(e))
+            await ctx.send("Deu ruim tentando desconectar o bot: " + str(e))
             await asyncio.sleep(1)
             await bot.close()
 
@@ -119,7 +133,11 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
     return managers[id]
 
 
-@bot.command("disconnect", aliases=["leave", "DISCONNECT", "LEAVE"], help="Desconecta do canal de voz")
+@bot.command(
+    "disconnect",
+    aliases=["leave", "DISCONNECT", "LEAVE"],
+    help="Desconecta do canal de voz",
+)
 async def cmd_disconnect(ctx: commands.Context, *_):
     voice_client = ctx.guild.voice_client
     if voice_client:
@@ -131,22 +149,23 @@ async def cmd_disconnect(ctx: commands.Context, *_):
         await ctx.send("I'm not connected to any voice channel.")
 
 
-@bot.command("connect", aliases=["join", "CONNECT", "JOIN"], help="Conecta ao canal de voz")
+@bot.command(
+    "connect", aliases=["join", "CONNECT", "JOIN"], help="Conecta ao canal de voz"
+)
 async def cmd_connect(ctx: commands.Context, *_):
     await get_manager(ctx)
     await update_status(ctx)
 
 
-@bot.command("queue", aliases=["q", "QUEUE", "Q"],
-             help="Mostra a fila de músicas")
+@bot.command("queue", aliases=["q", "QUEUE", "Q"], help="Mostra a fila de músicas")
 async def cmd_queue(ctx: commands.Context, *_):
     manager = await get_manager(ctx)
     if not manager:
         return
-    
+
     if not manager.queue:
         embed = discord.Embed(color=config.Color)
-        embed.add_field(name='Nada pra ver aqui, circulando.', value="(◐ω◑ )")
+        embed.add_field(name="Nada pra ver aqui, circulando.", value="(◐ω◑ )")
         await ctx.send(embed=embed)
         return
 
@@ -164,13 +183,13 @@ async def cmd_queue(ctx: commands.Context, *_):
 
         if queue_str:
             yield queue_str
-    
+
     if not queue_list:
         embed = discord.Embed(color=config.Color)
         embed.add_field(name="🎵 Nada tocando agora", value="")
         await ctx.send(embed=embed)
         return
-    
+
     for i, queue_str in enumerate(split(queue_list)):
         text = "🎵 Tocando agora:" if i == 0 else ""
         embed = discord.Embed(color=config.Color)
@@ -180,27 +199,33 @@ async def cmd_queue(ctx: commands.Context, *_):
     await update_status(ctx)
 
 
-@bot.command("play", aliases=["PLAY", "p", "P", "add", "ADD", "a", "A"], help="Adiciona uma música na fila de reprodução")
+@bot.command(
+    "play",
+    aliases=["PLAY", "p", "P", "add", "ADD", "a", "A"],
+    help="Adiciona uma música na fila de reprodução",
+)
 async def cmd_play(ctx: commands.Context, *args):
     if "willianzy" in str(ctx.author):
         await ctx.send("La vem musica de tchola do zy")
-    
+
     manager = await get_manager(ctx)
     if not manager:
         return
 
-    query = ' '.join(args)
+    query = " ".join(args)
     if query:
         queue_items = manager.search_add(query, str(ctx.author))
 
         if len(queue_items) == 1:
-            await ctx.send(f'🎵 {queue_items[0].title} adicionada na queue ≧◡≦')
+            await ctx.send(f"🎵 {queue_items[0].title} adicionada na queue ≧◡≦")
         elif len(queue_items) > 1:
             title_items = queue_items[:3]
             titles = ", ".join([qi.title for qi in title_items])
-            await ctx.send(f'🎵 {titles} e mais {len(queue_items) - len(title_items)} adicionadas na queue ≧◡≦')
+            await ctx.send(
+                f"🎵 {titles} e mais {len(queue_items) - len(title_items)} adicionadas na queue ≧◡≦"
+            )
         else:
-            await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')
+            await ctx.send(f"❌ Não consegui identificar a música, tente novamente ツ")
 
         if not manager.is_paused:
             manager.play(build_callback(ctx))
@@ -211,26 +236,43 @@ async def cmd_play(ctx: commands.Context, *args):
     await update_status(ctx)
 
 
-@bot.command("insert", aliases=["INSERT", "inject", "INJECT", "i", "I", "playnext", "PLAYNEXT", "pn", "PN"],
-             help="Adiciona uma música na fila de reprodução como próxima")
+@bot.command(
+    "insert",
+    aliases=[
+        "INSERT",
+        "inject",
+        "INJECT",
+        "i",
+        "I",
+        "playnext",
+        "PLAYNEXT",
+        "pn",
+        "PN",
+    ],
+    help="Adiciona uma música na fila de reprodução como próxima",
+)
 async def cmd_insert(ctx: commands.Context, *args):
     manager = await get_manager(ctx)
     if not manager:
         return
-    
-    query = ' '.join(args)
+
+    query = " ".join(args)
     queue_items = manager.search_add_next(query, str(ctx.author))
 
     if len(queue_items) == 1:
-        await ctx.send(f'🎵 {queue_items[0].title} injetada como próxima da fila ヽ(゜∇゜)ノ')
+        await ctx.send(
+            f"🎵 {queue_items[0].title} injetada como próxima da fila ヽ(゜∇゜)ノ"
+        )
 
     elif len(queue_items) > 1:
         title_items = queue_items[:3]
         titles = ", ".join([qi.title for qi in title_items])
-        await ctx.send(f'🎵 {titles} e mais {len(queue_items) - len(title_items)} inseridas como próximas na queue ヽ(゜∇゜)ノ')
+        await ctx.send(
+            f"🎵 {titles} e mais {len(queue_items) - len(title_items)} inseridas como próximas na queue ヽ(゜∇゜)ノ"
+        )
 
     else:
-        await ctx.send(f'❌ Não consegui identificar a música, tente novamente ツ')
+        await ctx.send(f"❌ Não consegui identificar a música, tente novamente ツ")
 
     manager.play(build_callback(ctx))
     await update_status(ctx)
@@ -244,23 +286,26 @@ async def cmd_shuffle(ctx: commands.Context, *args):
 
     queue = manager.queue
     if queue:
-        await ctx.send(f'Playlist randomizada ≧◡≦')
+        await ctx.send(f"Playlist randomizada ≧◡≦")
     else:
-        await ctx.send(f'❌ Não consegui identificar a playlist, tente novamente ツ')
+        await ctx.send(f"❌ Não consegui identificar a playlist, tente novamente ツ")
 
     manager.shuffle()
     await update_status(ctx)
 
 
-@bot.command("skip", aliases=["SKIP", "next", "NEXT", "n", "N", "s", "S"],
-             help="Pula a música atual ou x músicas")
+@bot.command(
+    "skip",
+    aliases=["SKIP", "next", "NEXT", "n", "N", "s", "S"],
+    help="Pula a música atual ou x músicas",
+)
 async def cmd_skip(ctx: commands.Context, *args):
     manager = await get_manager(ctx)
     if not manager:
         return
-    
+
     if not args or len(args) != 1:
-        await ctx.send('🎵 Pulando para a próxima música')
+        await ctx.send("🎵 Pulando para a próxima música")
         manager.next(build_callback(ctx))
     else:
         try:
@@ -268,65 +313,69 @@ async def cmd_skip(ctx: commands.Context, *args):
         except Exception:
             await ctx.send(f'que que se falo? "{args[0]}" devia ser um numero')
 
-        await ctx.send(f'🎵 Pulando {n} músicas')
+        await ctx.send(f"🎵 Pulando {n} músicas")
         manager.next_n(n, build_callback(ctx))
 
     await update_status(ctx)
 
 
-@bot.command("pause", aliases=["PAUSE"],
-             help="Pausa a reprodução do BOT")
+@bot.command("pause", aliases=["PAUSE"], help="Pausa a reprodução do BOT")
 async def cmd_pause(ctx: commands.Context, *_):
     manager = await get_manager(ctx)
     if not manager:
         return
 
-    await ctx.send('Pausando (>‘o’)>')
+    await ctx.send("Pausando (>‘o’)>")
     manager.pause(build_callback(ctx))
     await update_status(ctx)
 
 
-@bot.command("stop", aliases=["STOP"],
-             help="Para a reprodução do BOT")
+@bot.command("stop", aliases=["STOP"], help="Para a reprodução do BOT")
 async def cmd_stop(ctx: commands.Context, *_):
     manager = await get_manager(ctx)
     if not manager:
         return
 
-    await ctx.send('Queue limpa e player parado ʕ•ᴥ•ʔ')
+    await ctx.send("Queue limpa e player parado ʕ•ᴥ•ʔ")
     manager.clear_queue()
     manager.next(build_callback(ctx))
     await update_status(ctx)
 
 
-@bot.command("clear", aliases=["CLEAR", "clean", "CLEAN", "empty", "EMPTY"],
-             help="Limpa a fila de reprodução")
+@bot.command(
+    "clear",
+    aliases=["CLEAR", "clean", "CLEAN", "empty", "EMPTY"],
+    help="Limpa a fila de reprodução",
+)
 async def cmd_clear(ctx: commands.Context, *_):
     manager = await get_manager(ctx)
     if not manager:
         return
 
-    await ctx.send('❌ Queue limpa')
+    await ctx.send("❌ Queue limpa")
     manager.clear_queue()
     await update_status(ctx)
 
 
-@bot.command("cafe", aliases=["CAFE", "coffee", "COFFEE", "☕"],
-             help="Faz um cafezinho")
+@bot.command(
+    "cafe", aliases=["CAFE", "coffee", "COFFEE", "☕"], help="Faz um cafezinho"
+)
 async def cmd_cafe(ctx: commands.Context, *_):
-    await ctx.send('cafe ? 🐔☕')
+    await ctx.send("cafe ? 🐔☕")
     await update_status(ctx)
 
 
-@bot.command("ping", aliases=["PING"],
-             help="Response test")
+@bot.command("ping", aliases=["PING"], help="Response test")
 async def cmd_ping(ctx: commands.Context, *_):
-    await ctx.send('Pong 🏓')
+    await ctx.send("Pong 🏓")
     await update_status(ctx)
 
 
-@bot.command("say", aliases=["SAY", "fala", "FALA", "fale", "FALE", "diz", "DIZ"],
-             help="Diz alguma coisa no canal de voz por TTS")
+@bot.command(
+    "say",
+    aliases=["SAY", "fala", "FALA", "fale", "FALE", "diz", "DIZ"],
+    help="Diz alguma coisa no canal de voz por TTS",
+)
 async def cmd_say(ctx, *args):
     manager = await get_manager(ctx)
     if not manager:
@@ -346,6 +395,7 @@ async def cmd_nuke(ctx, *args):
 
 
 if config.EnableRunAdvanced:
+
     def aw(x):
         try:
             loop = asyncio.get_running_loop()
@@ -375,7 +425,7 @@ if config.EnableRunAdvanced:
             "welcome_sounds_repo": welcome_sounds_repo,
             "datetime": datetime,
             "utils": utils,
-            "aw": aw, # await async_method() -> aw(async_method())
+            "aw": aw,  # await async_method() -> aw(async_method())
         }
 
         if command == "vars":
@@ -390,16 +440,15 @@ if config.EnableRunAdvanced:
         embed.add_field(name="result", value=result)
         await ctx.send(embed=embed)
 
+
 @bot.event
 async def on_voice_state_update(
-        member: discord.member.Member,
-        before: discord.VoiceState,
-        after: discord.VoiceState
-    ):
+    member: discord.member.Member, before: discord.VoiceState, after: discord.VoiceState
+):
     # disconects when everyone leaves
     if not before.channel:
         return
-    
+
     members = [member for member in before.channel.members if member.id != bot.user.id]
     if not members:
         vc = get_voice_client_from_channel_id(before.channel.id)
@@ -456,7 +505,9 @@ def build_queue_list(manager: Manager) -> list[str]:
         indicator = ""
         if i == 0:
             indicator = status
-        queue_list.append(f"{indicator}‣ {i:02d} - **{item.title[:50]}** - por {item.author}")
+        queue_list.append(
+            f"{indicator}‣ {i:02d} - **{item.title[:50]}** - por {item.author}"
+        )
     return queue_list
 
 
@@ -486,14 +537,16 @@ async def update_status(ctx: commands.Context):
         state = "⏹️"
         buttons = None
         await bot.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.unknown
-            )
+            activity=discord.Activity(type=discord.ActivityType.unknown)
         )
 
     msgs = [msg async for msg in ctx.history() if msg.author.id == bot.user.id]
     for last in msgs:
-        if last.author.id == bot.user.id and last.embeds and last.embeds[0].title == "Info":
+        if (
+            last.author.id == bot.user.id
+            and last.embeds
+            and last.embeds[0].title == "Info"
+        ):
             try:
                 await last.delete()
             except NotFound:
@@ -507,6 +560,7 @@ async def update_status(ctx: commands.Context):
 def build_callback(ctx: commands.Context):
     def callback():
         bot.loop.create_task(update_status(ctx))
+
     return callback
 
 
@@ -520,5 +574,5 @@ def main():
     return bot.run(config.Token)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

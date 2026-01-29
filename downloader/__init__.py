@@ -10,16 +10,16 @@ class Downloader:
     def get_queue_items(self, search: str) -> list[MediaInfo]:
         return youtubeextractor.extract(search)
 
-    def get_media_url(self, url: str) -> str:
-
+    def get_media_url(self, url: str) -> str | None:
         options = {
-            'format': "worstaudio",
-            'source_address': '0.0.0.0',
+            # 'format': "worstaudio",
+            # 'source_address': '0.0.0.0',
             'default_search': 'ytsearch',
             'outtmpl': '%(id)s.%(ext)s',
             'noplaylist': True,
             'allow_playlist_files': False,
-            'paths': {'home': './dl/'}
+            'paths': {'home': './dl/'},
+            'extractor_args': {'youtube': {'player_client': ['web_music']}},
         }
 
         if self.cookie_file:
@@ -32,5 +32,16 @@ class Downloader:
 
             if 'requested_formats' in info and info['requested_formats']:
                 return info['requested_formats'][0]['url']
+
+
+            if 'entries' in info:
+                for entry in info['entries']:
+                    if 'url' in entry:
+                        return entry['url']
+                    
+                    if 'formats' in entry:
+                        for fmt in entry['formats']:
+                            if fmt.get('video_ext', "none") != "none" or fmt.get("audio_ext", "none") != "none":
+                                return fmt["url"]
 
             return None
