@@ -1,4 +1,4 @@
-FROM python:3.12
+FROM python:3.14
 
 WORKDIR /opt/bot
 RUN apt update && apt install -y ffmpeg curl nodejs npm
