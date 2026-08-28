@@ -123,7 +123,7 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
         voice_state = ctx.author.voice
 
         vc = ctx.guild.voice_client
-        if not voice_client:
+        if not vc:
             vc = await voice_state.channel.connect()
 
         managers[id] = Manager(Downloader(config.CookieFile), history_repo, vc)
