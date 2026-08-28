@@ -41,6 +41,7 @@ class Config:
     CookieFile: str
     DB: DBConfig
     EnableRunAdvanced: bool
+    ApiSecret: str
 
     @staticmethod
     def convert_color(colorstr: str) -> int:
@@ -66,4 +67,5 @@ class Config:
                 Password=env.get("BOT_DB_PASS"),
                 Database=env.get("BOT_DB_DATABASE"),
             ),
+            ApiSecret=env.get("API_SECRET", "banana")
         )

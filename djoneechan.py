@@ -11,6 +11,9 @@ from discord.ext import commands
 from discord.errors import NotFound
 from dotenv import dotenv_values
 from pymongo.synchronous.database import Database
+from fastapi import FastAPI, Header
+from fastapi.responses import HTMLResponse
+import uvicorn
 
 import utils
 from models.config import Config
@@ -27,6 +30,10 @@ bot = commands.Bot(
         voice_states=True, guilds=True, guild_messages=True, message_content=True
     ),
 )
+
+app = FastAPI()
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "activity_template.htm")) as f:
+    activity_template = f.read()
 
 db: Optional[Database] = None
 if config.DB.is_valid:
@@ -128,14 +135,33 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
 
         managers[id] = Manager(Downloader(config.CookieFile), history_repo, vc)
 
-        # if not os.getenv("DISABLE_WELCOME_SOUND"):
-        #     welcome_sounds_urls = welcome_sounds_repo.get_all_urls()
-        #     random_index = random.randrange(0, len(welcome_sounds_urls))
-        #     managers[id].search_add(welcome_sounds_urls[random_index], bot_author)
-        #     managers[id].play(build_callback(ctx), skip_history=True)
-
     return managers[id]
 
+async def get_manager_by_guild_id(guild_id: int) -> Optional[Manager]:
+    guild = bot.get_guild(guild_id)
+
+    if guild is None:
+        raise HTTPException(status_code=404, detail="Guild not found")
+
+    if guild_id not in managers:
+        vc = guild.voice_client
+
+        if vc is None or not vc.is_connected(): 
+            vcs = [
+                channel
+                for channel in guild.voice_channels
+                if channel.members
+            ]
+            
+            if not vcs:
+                raise HTTPException(status_code=409, detail="No voice channels with members found" )
+            
+            channel = max(vcs, key=lambda channel: len(channel.members))
+            vc = await channel.connect()
+
+        managers[id] = Manager(Downloader(config.CookieFile), history_repo, vc)
+
+    return managers[id]
 
 @bot.command(
     "disconnect",
@@ -573,10 +599,49 @@ def get_voice_client_from_channel_id(channel_id: int) -> discord.VoiceProtocol:
         if voice_client.channel.id == channel_id:
             return voice_client
 
+@app.post("/sound-effects/play")
+async def play_sound_effect(guild_id: int, sound_effect_id: str, x_api_secret: str = Header(..., alias="X-API-Secret")):
+    if x_api_secret != config.ApiSecret:
+        raise HTTPException(status_code=401, detail="Invalid API secret")
 
-def main():
-    return bot.run(config.Token)
+    guild = bot.get_guild(guild_id)
+    sound_effect = guild.get_soundboard_sound(sound_effect_id)
 
+    if sound_effect is None:
+        sound_effect = await guild.fetch_soundboard_sound(sound_effect_id)
+    
+    manager = await get_manager_by_guild_id(guild_id)
+    await manager._vc.channel.send_sound(sound_effect)
+    return { "success": True, "guild_id": guild.id, "sound_effect_id": sound_effect_id }
+
+
+@app.get("/activity", response_class=HTMLResponse)
+async def get_activity_data(guild_id: int):
+    manager = await get_manager_by_guild_id(guild_id)
+    items = [
+        f"""
+            <div class="track">
+                <span class="track-number">{i}.</span>
+                <a href="{item.url}" target="_blank" rel="noopener noreferrer">{item.title}</a> - Adicionado por: {item.author}
+            </div>
+        """
+        for i, item in enumerate(manager.queue)
+    ]
+    return activity_template.replace("###TRACKS##", "\n".join(items))
+
+async def main():
+    uvicornConfig = uvicorn.Config(
+        app,
+        host="0.0.0.0",
+        port=8080,
+        loop="asyncio",
+    )
+
+    server = uvicorn.Server(uvicornConfig)
+    await asyncio.gather(
+        bot.start(config.Token),
+        server.serve(),
+    )
 
 if __name__ == "__main__":
-    sys.exit(main())
+    asyncio.run(main())
