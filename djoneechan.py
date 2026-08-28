@@ -111,7 +111,7 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
         )
         try:
             voice_client = ctx.guild.voice_client
-            if not voice_client:
+            if voice_client:
                 await voice_client.disconnect(force=True)
             del managers[ctx.guild.id]
         except Exception as e:
@@ -121,7 +121,11 @@ async def get_manager(ctx: commands.Context) -> Optional[Manager]:
 
     if id not in managers:
         voice_state = ctx.author.voice
-        vc = await voice_state.channel.connect()
+
+        vc = ctx.guild.voice_client
+        if not voice_client:
+            vc = await voice_state.channel.connect()
+
         managers[id] = Manager(Downloader(config.CookieFile), history_repo, vc)
 
         # if not os.getenv("DISABLE_WELCOME_SOUND"):
