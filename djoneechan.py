@@ -615,19 +615,19 @@ async def play_sound_effect(guild_id: int, sound_effect_id: str, x_api_secret: s
     return { "success": True, "guild_id": guild.id, "sound_effect_id": sound_effect_id }
 
 
-@app.get("/activity", response_class=HTMLResponse)
-async def get_activity_data(guild_id: int):
-    manager = await get_manager_by_guild_id(guild_id)
-    items = [
-        f"""
-            <div class="track">
-                <span class="track-number">{i}.</span>
-                <a href="{item.url}" target="_blank" rel="noopener noreferrer">{item.title}</a> - Adicionado por: {item.author}
-            </div>
-        """
-        for i, item in enumerate(manager.queue)
-    ]
-    return activity_template.replace("###TRACKS##", "\n".join(items))
+@app.get("/", response_class=HTMLResponse)
+async def get_activity_data():#guild_id: int):
+    # manager = await get_manager_by_guild_id(guild_id)
+    # items = [
+    #     f"""
+    #         <div class="track">
+    #             <span class="track-number">{i}.</span>
+    #             <a href="{item.url}" target="_blank" rel="noopener noreferrer">{item.title}</a> - Adicionado por: {item.author}
+    #         </div>
+    #     """
+    #     for i, item in enumerate(manager.queue)
+    # ]
+    return activity_template#.replace("###TRACKS##", "\n".join(items))
 
 async def main():
     uvicornConfig = uvicorn.Config(
